@@ -1,9 +1,9 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useTranscription } from "../../hooks/useTranscription";
-import { STATUS_LABEL } from "../../utils/status";
-import { formatDate } from "../../utils/time";
-import { formatTimestamp } from "../../utils/format";
-import type { TranscriptionStatus } from "../../types";
+import { useTranscription } from "../hooks/useTranscription";
+import { STATUS_LABEL } from "../utils/status";
+import { formatDate } from "../utils/time";
+import { formatTimestamp } from "../utils/format";
+import type { TranscriptionStatus } from "../types";
 
 const TEXT_COLOR: Record<TranscriptionStatus, string> = {
   pending: "text-sky-500",

@@ -1,7 +1,7 @@
-import { useWorkers } from "../../hooks/useWorkers";
-import { WORKER_STATUS_LABEL } from "../../utils/status";
-import { timeAgo } from "../../utils/time";
-import type { WorkerStatus } from "../../types";
+import { useWorkers } from "../hooks/useWorkers";
+import { WORKER_STATUS_LABEL } from "../utils/status";
+import { timeAgo } from "../utils/time";
+import type { WorkerStatus } from "../types";
 
 const BORDER_COLOR: Record<WorkerStatus, string> = {
   idle: "border-emerald-500",

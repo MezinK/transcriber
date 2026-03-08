@@ -53,7 +53,7 @@ function IndexPage() {
   );
 }
 
-export function V1App() {
+export function App() {
   return (
     <div
       className="min-h-screen bg-zinc-950 text-zinc-200"

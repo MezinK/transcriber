@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { useUpload } from "../../hooks/useUpload";
+import { useUpload } from "../hooks/useUpload";
 
 interface UploadAreaProps {
   onSuccess?: () => void;

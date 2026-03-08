@@ -1,5 +1,5 @@
-import { useTranscriptions } from "../../hooks/useTranscriptions";
-import { useDeleteJob } from "../../hooks/useDeleteJob";
+import { useTranscriptions } from "../hooks/useTranscriptions";
+import { useDeleteJob } from "../hooks/useDeleteJob";
 import { JobRow } from "./JobRow";
 
 export function JobList() {

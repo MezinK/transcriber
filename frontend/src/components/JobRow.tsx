@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
-import type { Transcription, TranscriptionStatus } from "../../types";
-import { STATUS_LABEL } from "../../utils/status";
-import { timeAgo } from "../../utils/time";
+import type { Transcription, TranscriptionStatus } from "../types";
+import { STATUS_LABEL } from "../utils/status";
+import { timeAgo } from "../utils/time";
 
 const BORDER_COLOR: Record<TranscriptionStatus, string> = {
   pending: "border-sky-500",
