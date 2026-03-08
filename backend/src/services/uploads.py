@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from infra.models import Transcription, TranscriptionArtifact
+from infra.ids import generate_uuid
 from services.storage import (
     AsyncChunkReader,
     UploadValidationError,
@@ -66,7 +67,7 @@ async def create_upload(
     safe_name = sanitize_filename(original_filename)
     media_type = detect_media_type(safe_name)
 
-    file_id = uuid.uuid7()
+    file_id = generate_uuid()
     stored_name = f"{file_id}{Path(safe_name).suffix}"
     file_path = Path(upload_dir) / stored_name
 

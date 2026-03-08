@@ -6,6 +6,8 @@ from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, Text, func
 from sqlalchemy import JSON, Uuid
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from infra.ids import generate_uuid
+
 
 class Base(DeclarativeBase):
     pass
@@ -36,7 +38,7 @@ class Transcription(Base):
         Index("ix_transcriptions_created_at", "created_at"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid7)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=generate_uuid)
     source_filename: Mapped[str] = mapped_column(Text, nullable=False)
     media_type: Mapped[MediaType] = mapped_column(
         Enum(MediaType, name="media_type", native_enum=False),
@@ -119,7 +121,7 @@ class Worker(Base):
         Index("ix_workers_started_at", "started_at"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid7)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=generate_uuid)
     label: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[WorkerStatus] = mapped_column(
         Enum(WorkerStatus, name="worker_status", native_enum=False),

@@ -36,7 +36,6 @@ class TranscriptionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     completed_at: datetime | None
-    segments_json: dict | None = None
     speakers: list[SpeakerResponse] | None = None
     turns: list[TurnResponse] | None = None
 

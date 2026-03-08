@@ -49,6 +49,22 @@ export async function getTranscription(id: string): Promise<Transcription> {
   return handleResponse(res);
 }
 
+export async function renameSpeaker(
+  transcriptionId: string,
+  speakerKey: string,
+  displayName: string,
+): Promise<Transcription> {
+  const res = await fetch(
+    `/transcriptions/${transcriptionId}/speakers/${speakerKey}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ display_name: displayName }),
+    },
+  );
+  return handleResponse(res);
+}
+
 export async function deleteTranscription(id: string): Promise<void> {
   const res = await fetch(`/transcriptions/${id}`, { method: "DELETE" });
   if (!res.ok) {

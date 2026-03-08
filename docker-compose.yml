@@ -23,8 +23,8 @@ services:
       context: .
       dockerfile: backend/Dockerfile
       target: backend-api
-    expose:
-      - "8000"
+    ports:
+      - "8000:8000"
     environment:
       DATABASE_URL: "postgresql+asyncpg://app:app@postgres:5432/transcriptions"
       UPLOAD_DIR: /uploads

@@ -205,6 +205,34 @@ async def test_list_workers_marks_stale_from_heartbeat_age(session_factory):
     assert workers[0].status == WorkerStatus.STALE
 
 
+@pytest.mark.asyncio
+async def test_register_worker_prunes_stale_inactive_workers(session_factory):
+    now = utc_now()
+    stale_worker_id = uuid.uuid4()
+    await register_worker(
+        session_factory=session_factory,
+        worker_id=stale_worker_id,
+        label="stale-worker",
+        now=lambda: now - timedelta(minutes=10),
+    )
+
+    replacement_id = uuid.uuid4()
+    await register_worker(
+        session_factory=session_factory,
+        worker_id=replacement_id,
+        label="fresh-worker",
+        now=lambda: now,
+    )
+
+    workers = await list_workers(
+        session_factory=session_factory,
+        stale_after_seconds=60,
+        now=lambda: now,
+    )
+
+    assert [worker.id for worker in workers] == [replacement_id]
+
+
 async def _seed_transcription(session_factory) -> uuid.UUID:
     async with session_factory() as session:
         async with session.begin():
