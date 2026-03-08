@@ -16,6 +16,8 @@ from services.storage import (
 class SessionProtocol(Protocol):
     def add(self, instance: object) -> None: ...
 
+    async def delete(self, instance: object) -> None: ...
+
     async def flush(self) -> None: ...
 
     async def commit(self) -> None: ...
@@ -78,3 +80,30 @@ async def create_upload(
         raise
 
     return transcription
+
+
+async def delete_upload(
+    *,
+    session_factory: Callable[[], SessionContextManager],
+    transcription_id: uuid.UUID,
+) -> bool:
+    file_path: Path | None = None
+
+    try:
+        async with session_factory() as session:
+            transcription = await session.get(Transcription, transcription_id)
+            if transcription is None:
+                return False
+
+            artifact = await session.get(TranscriptionArtifact, transcription_id)
+            if artifact is not None:
+                file_path = Path(artifact.upload_path)
+
+            await session.delete(transcription)
+            await session.commit()
+    except Exception:
+        raise
+
+    if file_path is not None:
+        remove_file(file_path)
+    return True

@@ -1,149 +1,33 @@
 from pathlib import Path
 import uuid
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import func, select
+from sqlalchemy.orm import joinedload
 
 from api.schemas import TranscriptionListResponse, TranscriptionResponse
-from infra.models import Transcription, TranscriptionArtifact, TranscriptionStatus
+from infra.config import get_settings
+from infra.db import get_session_factory
+from infra.models import Transcription, TranscriptionArtifact
 from services.jobs import (
     TranscriptionDeletionConflictError,
     ensure_transcription_deletable,
 )
-from services.storage import remove_file
-from services.uploads import create_upload
+from services.uploads import create_upload, delete_upload
+
+router = APIRouter()
 
 
-def build_router(*, session_factory, settings) -> APIRouter:
-    router = APIRouter()
-
-    @router.post(
-        "/",
-        response_model=TranscriptionResponse,
-        status_code=status.HTTP_201_CREATED,
+@router.post("/", response_model=TranscriptionResponse, status_code=status.HTTP_201_CREATED)
+async def upload_transcription(file: UploadFile = File(...)) -> TranscriptionResponse:
+    settings = get_settings()
+    transcription = await create_upload(
+        file=file,
+        original_filename=file.filename or "",
+        session_factory=get_session_factory(),
+        upload_dir=Path(settings.upload_dir),
+        max_upload_bytes=settings.max_upload_bytes,
     )
-    async def create_transcription(file: UploadFile = File(...)):
-        try:
-            transcription = await create_upload(
-                file=file,
-                original_filename=file.filename or "",
-                session_factory=session_factory,
-                upload_dir=settings.upload_dir,
-                max_upload_bytes=settings.max_upload_bytes,
-            )
-        except ValueError as exc:
-            error_message = str(exc)
-            status_code = (
-                status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
-                if "File too large" in error_message
-                else status.HTTP_400_BAD_REQUEST
-            )
-            raise HTTPException(status_code=status_code, detail=error_message) from exc
-
-        return await _get_transcription_response(
-            session_factory=session_factory,
-            transcription_id=transcription.id,
-        )
-
-    @router.get("/", response_model=TranscriptionListResponse)
-    async def list_transcriptions(
-        status_filter: TranscriptionStatus | None = Query(None, alias="status"),
-        offset: int = Query(0, ge=0),
-        limit: int = Query(20, ge=1, le=100),
-    ):
-        async with session_factory() as session:
-            count_query = select(func.count(Transcription.id))
-            items_query = (
-                select(Transcription, TranscriptionArtifact)
-                .join(TranscriptionArtifact)
-                .order_by(Transcription.created_at.desc())
-                .offset(offset)
-                .limit(limit)
-            )
-
-            if status_filter is not None:
-                count_query = count_query.where(Transcription.status == status_filter)
-                items_query = items_query.where(Transcription.status == status_filter)
-
-            total = (await session.execute(count_query)).scalar_one()
-            result = await session.execute(items_query)
-            items = [
-                _serialize_transcription(transcription, artifact)
-                for transcription, artifact in result.all()
-            ]
-
-        return TranscriptionListResponse(items=items, total=total)
-
-    @router.get("/{transcription_id}", response_model=TranscriptionResponse)
-    async def get_transcription(transcription_id: uuid.UUID):
-        response = await _get_transcription_response(
-            session_factory=session_factory,
-            transcription_id=transcription_id,
-        )
-        if response is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transcription not found")
-        return response
-
-    @router.delete("/{transcription_id}", status_code=status.HTTP_204_NO_CONTENT)
-    async def delete_transcription(transcription_id: uuid.UUID):
-        try:
-            await ensure_transcription_deletable(
-                session_factory=session_factory,
-                transcription_id=transcription_id,
-            )
-        except TranscriptionDeletionConflictError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Transcription is currently leased",
-            ) from exc
-
-        file_path: str | None = None
-        async with session_factory() as session:
-            async with session.begin():
-                result = await session.execute(
-                    select(Transcription, TranscriptionArtifact)
-                    .join(TranscriptionArtifact)
-                    .where(Transcription.id == transcription_id)
-                )
-                row = result.one_or_none()
-                if row is None:
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail="Transcription not found",
-                    )
-
-                transcription, artifact = row
-                file_path = artifact.upload_path
-                await session.delete(transcription)
-
-        if file_path is not None:
-            remove_file(Path(file_path))
-
-    return router
-
-
-async def _get_transcription_response(
-    *,
-    session_factory,
-    transcription_id: uuid.UUID,
-) -> TranscriptionResponse | None:
-    async with session_factory() as session:
-        result = await session.execute(
-            select(Transcription, TranscriptionArtifact)
-            .join(TranscriptionArtifact)
-            .where(Transcription.id == transcription_id)
-        )
-        row = result.one_or_none()
-        if row is None:
-            return None
-        transcription, artifact = row
-        return _serialize_transcription(transcription, artifact)
-
-
-def _serialize_transcription(
-    transcription: Transcription,
-    artifact: TranscriptionArtifact,
-) -> TranscriptionResponse:
     return TranscriptionResponse(
         id=transcription.id,
         source_filename=transcription.source_filename,
@@ -151,9 +35,94 @@ def _serialize_transcription(
         status=transcription.status,
         attempt_count=transcription.attempt_count,
         error=transcription.error,
-        transcript_text=artifact.transcript_text,
-        segments_json=artifact.segments_json,
         created_at=transcription.created_at,
         updated_at=transcription.updated_at,
         completed_at=transcription.completed_at,
+    )
+
+
+@router.get("/", response_model=TranscriptionListResponse)
+async def list_transcriptions(
+    offset: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+) -> TranscriptionListResponse:
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        count = (await session.execute(select(func.count(Transcription.id)))).scalar_one()
+        result = await session.execute(
+            select(Transcription)
+            .options(joinedload(Transcription.artifact))
+            .order_by(Transcription.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        items = result.unique().scalars().all()
+
+    return TranscriptionListResponse(
+        items=[_serialize_transcription(item) for item in items],
+        total=count,
+    )
+
+
+@router.get("/{transcription_id}", response_model=TranscriptionResponse)
+async def get_transcription(transcription_id: uuid.UUID) -> TranscriptionResponse:
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        result = await session.execute(
+            select(Transcription)
+            .options(joinedload(Transcription.artifact))
+            .where(Transcription.id == transcription_id)
+        )
+        transcription = result.unique().scalar_one_or_none()
+
+    if transcription is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Transcription not found",
+        )
+
+    return _serialize_transcription(transcription)
+
+
+@router.delete("/{transcription_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_transcription_route(transcription_id: uuid.UUID) -> Response:
+    session_factory = get_session_factory()
+    try:
+        await ensure_transcription_deletable(
+            session_factory=session_factory,
+            transcription_id=transcription_id,
+        )
+    except TranscriptionDeletionConflictError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Transcription is currently being processed",
+        ) from None
+
+    deleted = await delete_upload(
+        session_factory=session_factory,
+        transcription_id=transcription_id,
+    )
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Transcription not found",
+        )
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def _serialize_transcription(transcription: Transcription) -> TranscriptionResponse:
+    artifact: TranscriptionArtifact | None = transcription.artifact
+    return TranscriptionResponse(
+        id=transcription.id,
+        source_filename=transcription.source_filename,
+        media_type=transcription.media_type,
+        status=transcription.status,
+        attempt_count=transcription.attempt_count,
+        error=transcription.error,
+        created_at=transcription.created_at,
+        updated_at=transcription.updated_at,
+        completed_at=transcription.completed_at,
+        transcript_text=None if artifact is None else artifact.transcript_text,
+        segments_json=None if artifact is None else artifact.segments_json,
     )
