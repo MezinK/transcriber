@@ -58,6 +58,9 @@ class Transcription(Base):
 
 class Worker(Base):
     __tablename__ = "workers"
+    __table_args__ = (
+        Index("ix_workers_heartbeat", "last_heartbeat"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
     last_heartbeat: Mapped[datetime] = mapped_column(

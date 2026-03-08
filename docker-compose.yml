@@ -12,6 +12,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    shm_size: 256mb
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   api:
     build:
@@ -23,6 +28,8 @@ services:
       DATABASE_URL: "postgresql+asyncpg://app:app@postgres:5432/transcriptions"
       UPLOAD_DIR: /uploads
       MAX_UPLOAD_BYTES: "524288000"  # 500 MB
+      DB_POOL_SIZE: "10"
+      DB_MAX_OVERFLOW: "5"
     volumes:
       - uploads:/uploads
     depends_on:
@@ -38,12 +45,16 @@ services:
       UPLOAD_DIR: /uploads
       TRANSCRIPTION_ENGINE: faster-whisper
       WHISPER_MODEL: base
+      DB_POOL_SIZE: "2"
+      DB_MAX_OVERFLOW: "1"
     volumes:
       - uploads:/uploads
     stop_grace_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
+    # Scale with: docker compose up --scale worker=N
+    # The DB claim logic (FOR UPDATE SKIP LOCKED) supports concurrent workers.
 
 volumes:
   pgdata:
