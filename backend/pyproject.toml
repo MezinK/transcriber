@@ -21,6 +21,7 @@ dev = [
     "pytest-asyncio>=0.25",
     "httpx>=0.28",
     "psycopg[binary]>=3.2",
+    "aiosqlite>=0.21",
 ]
 
 [build-system]
