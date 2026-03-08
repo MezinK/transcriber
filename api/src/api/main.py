@@ -11,6 +11,7 @@ from shared.db import async_session, get_engine
 from shared.models import Base
 
 from api.routes.transcriptions import router as transcriptions_router
+from api.routes.workers import router as workers_router
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Transcription API", lifespan=lifespan)
 app.add_middleware(RequestIDMiddleware)
 app.include_router(transcriptions_router, prefix="/transcriptions", tags=["transcriptions"])
+app.include_router(workers_router, prefix="/workers", tags=["workers"])
 
 
 @app.get("/health")

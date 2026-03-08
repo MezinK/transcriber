@@ -30,3 +30,25 @@ class TranscriptionResponse(BaseModel):
 class TranscriptionListResponse(BaseModel):
     items: list[TranscriptionResponse]
     total: int
+
+
+class WorkerCurrentJob(BaseModel):
+    id: uuid.UUID
+    file_name: str
+    status: TranscriptionStatus
+
+    model_config = {"from_attributes": True}
+
+
+class WorkerResponse(BaseModel):
+    id: uuid.UUID
+    last_heartbeat: datetime
+    started_at: datetime
+    current_job: WorkerCurrentJob | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class WorkerListResponse(BaseModel):
+    items: list[WorkerResponse]
+    total: int
