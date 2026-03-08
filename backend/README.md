@@ -15,7 +15,14 @@ Unified backend project for the local transcription tool.
 - Local uploads default to `backend/var/uploads`.
 - Docker Compose overrides `UPLOAD_DIR` to `/uploads` inside the containers.
 - Worker diarization defaults to `DIARIZATION_ENGINE=pyannote` and `DIARIZATION_DEVICE=cpu`.
-- `PYANNOTE_AUTH_TOKEN` must be set for worker environments that need to download or load pyannote diarization models.
+- `HF_TOKEN` is shared by diarization and `faster-whisper` model downloads.
+- `HF_TOKEN` must be set when the worker needs to download or load pyannote diarization models, and that token must have accepted the `pyannote/speaker-diarization-community-1` model terms on Hugging Face.
+- Docker Compose runs the backend services as `linux/amd64` so the pyannote dependency chain has compatible wheels on ARM hosts.
+
+## WhisperX Planning Guardrail
+
+- Verify WhisperX integration details against Context7 before changing backend runtime code.
+- Treat `docs/plans/2026-03-08-whisperx-context7-notes.md` as the checked-in summary of the current WhisperX Python flow and runtime caveats.
 
 ## Transcript Artifacts
 
