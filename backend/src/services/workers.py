@@ -5,7 +5,7 @@ import uuid
 
 from sqlalchemy import select
 
-from infra.models import Transcription, Worker, WorkerStatus
+from infra.models import Worker, WorkerStatus
 from infra.time import utc_now
 
 STALE_AFTER_SECONDS = 120
@@ -85,8 +85,7 @@ async def set_worker_current_job(
     async with session_factory() as session:
         async with session.begin():
             worker = await session.get(Worker, worker_id, with_for_update=True)
-            transcription = await session.get(Transcription, transcription_id)
-            if worker is None or transcription is None:
+            if worker is None:
                 return False
 
             worker.status = WorkerStatus.PROCESSING
@@ -135,7 +134,7 @@ async def list_workers(
     snapshots: list[WorkerSnapshot] = []
     for worker in workers:
         status = worker.status
-        if _coerce_utc(worker.last_heartbeat) < threshold:
+        if _normalize_timestamp(worker.last_heartbeat) < threshold:
             status = WorkerStatus.STALE
 
         snapshots.append(
@@ -153,7 +152,7 @@ async def list_workers(
     return snapshots
 
 
-def _coerce_utc(value: datetime) -> datetime:
+def _normalize_timestamp(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
-    return value.astimezone(UTC)
+    return value

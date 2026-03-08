@@ -28,17 +28,6 @@ async def session_factory(tmp_path) -> AsyncGenerator:
         await engine.dispose()
 
 
-async def _seed_transcription(session_factory) -> uuid.UUID:
-    async with session_factory() as session:
-        async with session.begin():
-            transcription = Transcription(
-                source_filename="meeting.wav",
-                media_type=MediaType.AUDIO,
-            )
-            session.add(transcription)
-        return transcription.id
-
-
 @pytest.mark.asyncio
 async def test_register_worker_for_ui(session_factory):
     worker_id = uuid.uuid4()
@@ -144,3 +133,14 @@ async def test_list_workers_sorted_for_ui_consumption(session_factory):
     )
 
     assert [worker.id for worker in workers] == [newer_worker, older_worker]
+
+
+async def _seed_transcription(session_factory) -> uuid.UUID:
+    async with session_factory() as session:
+        async with session.begin():
+            transcription = Transcription(
+                source_filename="worker.wav",
+                media_type=MediaType.AUDIO,
+            )
+            session.add(transcription)
+        return transcription.id

@@ -155,17 +155,6 @@ async def session_factory(postgres_database: PostgresTestDatabase):
         await engine.dispose()
 
 
-async def _seed_transcription(session_factory) -> uuid.UUID:
-    async with session_factory() as session:
-        async with session.begin():
-            transcription = Transcription(
-                source_filename="meeting.wav",
-                media_type=MediaType.AUDIO,
-            )
-            session.add(transcription)
-        return transcription.id
-
-
 @pytest.mark.asyncio
 async def test_set_worker_processing_and_clear_for_ui(session_factory):
     worker_id = uuid.uuid4()
@@ -214,3 +203,14 @@ async def test_list_workers_marks_stale_from_heartbeat_age(session_factory):
 
     assert len(workers) == 1
     assert workers[0].status == WorkerStatus.STALE
+
+
+async def _seed_transcription(session_factory) -> uuid.UUID:
+    async with session_factory() as session:
+        async with session.begin():
+            transcription = Transcription(
+                source_filename="worker.wav",
+                media_type=MediaType.AUDIO,
+            )
+            session.add(transcription)
+        return transcription.id
