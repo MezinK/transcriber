@@ -704,3 +704,34 @@ Update the plan doc with any gaps found during the smoke test.
 git add docs/plans/2026-03-08-backend-architecture-refactor.md
 git commit -m "docs: record backend refactor verification notes"
 ```
+
+---
+
+## Verification Notes
+
+### 2026-03-08 local stack smoke test
+
+Verification commands run:
+
+```bash
+COMPOSE_PROJECT_NAME=transcriber_smoke docker compose up --build -d
+curl -f http://localhost:8000/health
+curl -F "file=@audio.webm" http://localhost:8000/transcriptions/
+curl http://localhost:8000/transcriptions/{id}
+curl http://localhost:8000/transcriptions/
+curl http://localhost:8000/workers/
+COMPOSE_PROJECT_NAME=transcriber_smoke docker compose down
+```
+
+Observed results:
+
+- `/health` returned `200` with `{"status":"ok"}`
+- upload returned `201` and created a pending transcription row
+- worker processed the upload to `completed`
+- `/transcriptions/` returned the completed transcription with transcript text and segments
+- `/workers/` returned one active worker row for the UI
+
+Follow-up gaps discovered:
+
+- existing legacy Postgres volumes are not migrated in place; the new schema works on a fresh database, but older local volumes still contain the pre-refactor table shape and need either a manual reset or a future data-migration path
+- Alembic container runtime must honor `DATABASE_URL` from the environment and convert async Postgres URLs to a sync driver for migrations; this was fixed during verification
