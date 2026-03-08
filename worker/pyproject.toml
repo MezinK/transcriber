@@ -1,0 +1,16 @@
+[project]
+name = "worker"
+version = "0.1.0"
+description = "Transcription worker/consumer"
+requires-python = ">=3.14"
+dependencies = [
+    "faster-whisper>=1.1",
+    "shared",
+]
+
+[tool.uv.sources]
+shared = { path = "../shared", editable = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
