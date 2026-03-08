@@ -51,7 +51,7 @@ services:
       WHISPER_COMPUTE_TYPE: int8
       WHISPER_BATCH_SIZE: "4"
       WHISPER_DIARIZATION_ENABLED: "true"
-      HF_TOKEN: ${HF_TOKEN:?Set HF_TOKEN to a Hugging Face token with access to pyannote/speaker-diarization-community-1}
+      HF_TOKEN: ${HF_TOKEN:?Set HF_TOKEN when WhisperX diarization is enabled}
     command: ["python", "-m", "worker.main"]
     volumes:
       - uploads:/uploads

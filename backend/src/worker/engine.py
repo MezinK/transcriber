@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import os
 from typing import Protocol
 
 
@@ -22,6 +21,7 @@ class FasterWhisperEngine:
         model_size: str = "base",
         device: str = "cpu",
         compute_type: str = "int8",
+        hf_token: str | None = None,
     ) -> None:
         from faster_whisper import WhisperModel
 
@@ -29,6 +29,7 @@ class FasterWhisperEngine:
             model_size,
             device=device,
             compute_type=compute_type,
+            use_auth_token=hf_token,
         )
 
     def transcribe(self, file_path: str) -> TranscriptionResult:
@@ -70,13 +71,16 @@ class FasterWhisperEngine:
         )
 
 
-def load_engine() -> TranscriptionEngine:
-    engine_name = os.environ.get("TRANSCRIPTION_ENGINE", "faster-whisper")
-    if engine_name != "faster-whisper":
-        raise ValueError(f"Unsupported transcription engine: {engine_name}")
-
+def load_engine(
+    *,
+    model_size: str = "base",
+    device: str = "cpu",
+    compute_type: str = "int8",
+    hf_token: str | None = None,
+) -> TranscriptionEngine:
     return FasterWhisperEngine(
-        model_size=os.environ.get("WHISPER_MODEL", "base"),
-        device=os.environ.get("WHISPER_DEVICE", "cpu"),
-        compute_type=os.environ.get("WHISPER_COMPUTE_TYPE", "int8"),
+        model_size=model_size,
+        device=device,
+        compute_type=compute_type,
+        hf_token=hf_token,
     )

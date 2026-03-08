@@ -209,12 +209,21 @@ class WorkerRuntime:
 
 async def main() -> None:
     settings = get_settings()
+    if settings.transcription_backend != "whisperx":
+        raise ValueError(
+            f"Unsupported transcription backend: {settings.transcription_backend}"
+        )
     diarization_engine_name = (
         "pyannote" if settings.whisper_diarization_enabled else "none"
     )
     runtime = WorkerRuntime(
         session_factory=get_session_factory(),
-        engine=load_engine(),
+        engine=load_engine(
+            model_size=settings.whisper_model,
+            device=settings.whisper_device,
+            compute_type=settings.whisper_compute_type,
+            hf_token=settings.hf_token,
+        ),
         diarization_engine=load_diarization_engine(
             diarization_engine_name,
             auth_token=settings.hf_token,
