@@ -42,7 +42,7 @@ export function UploadArea({ onSuccess }: UploadAreaProps) {
   }, []);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       <div
         role="button"
         tabIndex={0}
@@ -56,35 +56,38 @@ export function UploadArea({ onSuccess }: UploadAreaProps) {
             if (!uploading) inputRef.current?.click();
           }
         }}
-        className={`relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-10 transition-colors duration-150 ${
+        className={`group relative flex flex-col items-center justify-center border px-8 py-20 transition-all duration-300 ${
           dragActive
-            ? "border-slate-400 bg-slate-50"
-            : "border-slate-300 bg-white hover:border-slate-400 hover:bg-slate-50"
+            ? "border-[#1a1a1a] bg-[#f5f3ed]"
+            : "border-[#e8e4de] bg-transparent hover:border-[#6b6560] hover:bg-[#f5f3ed]"
         } ${uploading ? "pointer-events-none" : "cursor-pointer"}`}
       >
-        {/* Upload icon */}
-        <div className="mb-3 rounded-full bg-slate-100 p-3">
+        {/* Minimal upload arrow icon — thin line style */}
+        <div className="mb-6 text-[#6b6560] transition-colors duration-300 group-hover:text-[#1a1a1a]">
           <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
+            width="24"
+            height="24"
             viewBox="0 0 24 24"
-            strokeWidth={1.5}
+            fill="none"
             stroke="currentColor"
-            className="h-6 w-6 text-slate-400"
+            strokeWidth="1"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-            />
+            <line x1="12" y1="19" x2="12" y2="5" />
+            <polyline points="5 12 12 5 19 12" />
           </svg>
         </div>
 
-        <p className="text-sm font-medium text-slate-600">
-          {dragActive ? "Drop file here" : "Drag & drop a file here"}
+        <p
+          className={`font-['Playfair_Display',serif] text-xl italic text-[#1a1a1a] transition-opacity duration-300 ${
+            dragActive ? "opacity-100" : "opacity-80 group-hover:opacity-100"
+          }`}
+        >
+          {dragActive ? "Release to transcribe" : "Place your recording"}
         </p>
-        <p className="mt-1 text-xs text-slate-400">
-          or click to browse &middot; audio &amp; video supported
+        <p className="mt-2 font-['DM_Sans',sans-serif] text-xs font-normal tracking-wide text-[#6b6560]">
+          or click to browse · audio &amp; video supported
         </p>
 
         <input
@@ -96,21 +99,26 @@ export function UploadArea({ onSuccess }: UploadAreaProps) {
         />
       </div>
 
-      {/* Progress bar */}
+      {/* Elegant progress bar */}
       {uploading && progress && (
-        <div className="space-y-2">
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+        <div className="space-y-3 px-1">
+          <div className="h-px w-full overflow-hidden bg-[#e8e4de]">
             <div
-              className="h-full rounded-full bg-slate-600 transition-all duration-300 ease-out"
+              className="h-full bg-[#1a1a1a] transition-all duration-300 ease-out"
               style={{ width: `${progress.percent}%` }}
             />
           </div>
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Uploading... {progress.percent}%</span>
+          <div className="flex items-center justify-between">
+            <span className="font-['DM_Sans',sans-serif] text-xs tracking-wide text-[#6b6560]">
+              Uploading&ensp;
+              <span className="font-['JetBrains_Mono',monospace] text-[11px] text-[#1a1a1a]">
+                {progress.percent}%
+              </span>
+            </span>
             <button
               type="button"
               onClick={cancel}
-              className="text-slate-400 hover:text-slate-600 transition-colors"
+              className="font-['DM_Sans',sans-serif] text-xs tracking-wide text-[#6b6560] transition-colors duration-300 hover:text-[#c43e1c]"
             >
               Cancel
             </button>
@@ -120,7 +128,7 @@ export function UploadArea({ onSuccess }: UploadAreaProps) {
 
       {/* Error message */}
       {error && (
-        <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
+        <div className="border-l-2 border-[#c43e1c] py-2 pl-4 font-['DM_Sans',sans-serif] text-sm text-[#c43e1c]">
           {error}
         </div>
       )}

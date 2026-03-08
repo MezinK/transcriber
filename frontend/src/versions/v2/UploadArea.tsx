@@ -40,15 +40,15 @@ export function UploadArea({ onSuccess }: UploadAreaProps) {
   }, []);
 
   return (
-    <div className="flex h-full flex-col items-center justify-center px-6">
-      <div className="w-full max-w-xl">
+    <div className="relative flex h-full flex-col items-center justify-center px-6">
+      <div className="w-full max-w-lg">
         {/* Heading */}
-        <div className="mb-8 text-center">
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-800">
+        <div className="mb-10 text-center">
+          <h2 className="font-['Sora',sans-serif] text-2xl font-semibold tracking-tight text-[#e2e4f0]">
             New Transcription
           </h2>
-          <p className="mt-1.5 text-sm text-slate-500">
-            Upload an audio or video file to begin transcribing.
+          <p className="mt-2 font-['DM_Sans',sans-serif] text-sm text-[#6b6f8a]">
+            Upload an audio or video file to begin transcribing
           </p>
         </div>
 
@@ -66,27 +66,33 @@ export function UploadArea({ onSuccess }: UploadAreaProps) {
               if (!uploading) inputRef.current?.click();
             }
           }}
-          className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-8 py-16 transition-all duration-200 ${
+          className={[
+            "relative flex flex-col items-center justify-center rounded-xl border px-8 py-16 transition-all duration-300",
             dragActive
-              ? "border-indigo-400 bg-indigo-50/60 ring-4 ring-indigo-100"
-              : "border-slate-200 bg-slate-50/50 hover:border-indigo-300 hover:bg-indigo-50/30"
-          } ${uploading ? "pointer-events-none opacity-70" : "cursor-pointer"}`}
+              ? "border-[#818cf8] bg-[rgba(129,140,248,0.06)] shadow-[0_0_30px_rgba(129,140,248,0.15)]"
+              : "border-[rgba(129,140,248,0.12)] bg-[#12122a] hover:border-[rgba(129,140,248,0.25)] hover:shadow-[0_0_20px_rgba(129,140,248,0.08)]",
+            uploading ? "pointer-events-none opacity-60" : "cursor-pointer",
+            dragActive ? "animate-[glow-pulse_2s_ease-in-out_infinite]" : "",
+          ].join(" ")}
         >
           {/* Upload icon */}
           <div
-            className={`mb-4 flex h-14 w-14 items-center justify-center rounded-full transition-colors duration-200 ${
-              dragActive ? "bg-indigo-100" : "bg-slate-100"
-            }`}
+            className={[
+              "mb-5 flex h-14 w-14 items-center justify-center rounded-full border transition-all duration-300",
+              dragActive
+                ? "border-[#818cf8] bg-[rgba(129,140,248,0.12)] shadow-[0_0_16px_rgba(129,140,248,0.2)]"
+                : "border-[rgba(129,140,248,0.1)] bg-[rgba(129,140,248,0.05)]",
+            ].join(" ")}
           >
             <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
               viewBox="0 0 24 24"
-              strokeWidth={1.5}
+              fill="none"
               stroke="currentColor"
-              className={`h-7 w-7 transition-colors duration-200 ${
-                dragActive ? "text-indigo-600" : "text-slate-400"
-              }`}
+              strokeWidth={1.5}
+              className={[
+                "h-7 w-7 transition-colors duration-300",
+                dragActive ? "text-[#818cf8]" : "text-[#6b6f8a]",
+              ].join(" ")}
             >
               <path
                 strokeLinecap="round"
@@ -96,10 +102,10 @@ export function UploadArea({ onSuccess }: UploadAreaProps) {
             </svg>
           </div>
 
-          <p className="text-sm font-medium text-slate-700">
-            {dragActive ? "Drop your file here" : "Drag & drop a file here"}
+          <p className="font-['Sora',sans-serif] text-sm font-medium text-[#e2e4f0]">
+            {dragActive ? "Drop your file here" : "Drop file to transcribe"}
           </p>
-          <p className="mt-1.5 text-xs text-slate-400">
+          <p className="mt-2 font-['DM_Sans',sans-serif] text-xs text-[#6b6f8a]">
             or click to browse &middot; audio &amp; video supported
           </p>
 
@@ -114,21 +120,21 @@ export function UploadArea({ onSuccess }: UploadAreaProps) {
 
         {/* Progress */}
         {uploading && progress && (
-          <div className="mt-6 space-y-2.5">
-            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+          <div className="mt-6 space-y-3">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[rgba(129,140,248,0.1)]">
               <div
-                className="h-full rounded-full bg-indigo-600 transition-all duration-300 ease-out"
+                className="h-full rounded-full bg-gradient-to-r from-[#818cf8] to-[#6366f1] shadow-[0_0_12px_rgba(129,140,248,0.4)] transition-all duration-300 ease-out"
                 style={{ width: `${progress.percent}%` }}
               />
             </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-medium text-slate-600">
+            <div className="flex items-center justify-between">
+              <span className="font-['JetBrains_Mono',monospace] text-xs text-[#818cf8]">
                 Uploading... {progress.percent}%
               </span>
               <button
                 type="button"
                 onClick={cancel}
-                className="text-slate-400 transition-colors hover:text-red-500"
+                className="font-['DM_Sans',sans-serif] text-xs text-[#6b6f8a] transition-colors duration-200 hover:text-[#f87171]"
               >
                 Cancel
               </button>
@@ -138,7 +144,7 @@ export function UploadArea({ onSuccess }: UploadAreaProps) {
 
         {/* Error */}
         {error && (
-          <div className="mt-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
+          <div className="mt-6 rounded-lg border border-[rgba(248,113,113,0.2)] bg-[rgba(248,113,113,0.06)] px-4 py-3 font-['DM_Sans',sans-serif] text-sm text-[#f87171]">
             {error}
           </div>
         )}

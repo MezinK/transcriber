@@ -1,7 +1,8 @@
 import { Link, useParams } from "react-router-dom";
 import { useTranscription } from "../../hooks/useTranscription";
-import { STATUS_BG, STATUS_LABELS } from "../../utils/status";
+import { STATUS_LABELS } from "../../utils/status";
 import { formatDate } from "../../utils/time";
+import type { TranscriptionStatus } from "../../types";
 
 interface Segment {
   start: number;
@@ -27,19 +28,39 @@ function isSegmentArray(value: unknown): value is Segment[] {
   );
 }
 
+const STATUS_PILL_COLORS: Record<TranscriptionStatus, string> = {
+  pending: "text-[#6b6560] border-[#6b6560]/30",
+  processing: "text-amber-600 border-amber-400/40",
+  completed: "text-[#c43e1c] border-[#c43e1c]/30",
+  failed: "text-red-600 border-red-400/40",
+};
+
+const STATUS_DOT_COLORS: Record<TranscriptionStatus, string> = {
+  pending: "bg-[#6b6560]",
+  processing: "bg-amber-500",
+  completed: "bg-[#c43e1c]",
+  failed: "bg-red-600",
+};
+
 export function TranscriptView() {
   const { id } = useParams<{ id: string }>();
   const { job, loading, error } = useTranscription(id);
 
   if (loading) {
     return (
-      <div className="animate-pulse space-y-4">
-        <div className="h-5 w-32 rounded bg-slate-100" />
-        <div className="h-7 w-64 rounded bg-slate-100" />
-        <div className="space-y-2 pt-4">
-          <div className="h-4 w-full rounded bg-slate-50" />
-          <div className="h-4 w-5/6 rounded bg-slate-50" />
-          <div className="h-4 w-4/6 rounded bg-slate-50" />
+      <div className="animate-pulse space-y-8">
+        <div className="h-3 w-16 rounded-sm bg-[#e8e4de]" />
+        <div className="space-y-3">
+          <div className="h-8 w-80 rounded-sm bg-[#e8e4de]" />
+          <div className="h-3 w-32 rounded-sm bg-[#e8e4de]/60" />
+        </div>
+        <div className="h-px bg-[#e8e4de]" />
+        <div className="space-y-4 pt-4">
+          <div className="h-4 w-full rounded-sm bg-[#e8e4de]/40" />
+          <div className="h-4 w-5/6 rounded-sm bg-[#e8e4de]/40" />
+          <div className="h-4 w-4/6 rounded-sm bg-[#e8e4de]/40" />
+          <div className="h-4 w-full rounded-sm bg-[#e8e4de]/40" />
+          <div className="h-4 w-3/4 rounded-sm bg-[#e8e4de]/40" />
         </div>
       </div>
     );
@@ -47,26 +68,14 @@ export function TranscriptView() {
 
   if (error || !job) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-8">
         <Link
           to="/1"
-          className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-slate-600 transition-colors"
+          className="font-['DM_Sans',sans-serif] text-xs font-medium tracking-wide text-[#6b6560] transition-colors duration-300 hover:text-[#1a1a1a]"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            className="h-4 w-4"
-          >
-            <path
-              fillRule="evenodd"
-              d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z"
-              clipRule="evenodd"
-            />
-          </svg>
-          Back
+          ← Back
         </Link>
-        <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-600">
+        <div className="border-l-2 border-[#c43e1c] py-2 pl-4 font-['DM_Sans',sans-serif] text-sm text-[#c43e1c]">
           {error ?? "Transcription not found"}
         </div>
       </div>
@@ -81,108 +90,93 @@ export function TranscriptView() {
       : null;
 
   return (
-    <div className="space-y-6">
+    <div>
       {/* Back link */}
       <Link
         to="/1"
-        className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-slate-600 transition-colors"
+        className="inline-block font-['DM_Sans',sans-serif] text-xs font-medium tracking-wide text-[#6b6560] transition-colors duration-300 hover:text-[#1a1a1a]"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          className="h-4 w-4"
-        >
-          <path
-            fillRule="evenodd"
-            d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z"
-            clipRule="evenodd"
-          />
-        </svg>
-        Back to transcriptions
+        ← Back
       </Link>
 
-      {/* Header */}
-      <div className="space-y-2">
-        <h1 className="text-lg font-semibold text-slate-700">
+      {/* Header area — dramatic typographic hierarchy */}
+      <div className="mt-10">
+        <h1 className="font-['Playfair_Display',serif] text-3xl font-bold leading-tight tracking-tight text-[#1a1a1a] sm:text-4xl">
           {job.file_name}
         </h1>
-        <div className="flex items-center gap-3 text-sm">
+
+        {/* Status pill + date */}
+        <div className="mt-4 flex items-center gap-4">
           <span
-            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BG[job.status]}`}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-['DM_Sans',sans-serif] text-[10px] font-medium uppercase tracking-[0.15em] ${STATUS_PILL_COLORS[job.status]}`}
           >
+            <span
+              className={`inline-block h-1.5 w-1.5 rounded-full ${STATUS_DOT_COLORS[job.status]} ${
+                job.status === "processing" ? "animate-pulse" : ""
+              }`}
+            />
             {STATUS_LABELS[job.status]}
           </span>
-          <span className="text-slate-400">
+          <span className="font-['JetBrains_Mono',monospace] text-[11px] text-[#6b6560]">
             {formatDate(job.created_at)}
           </span>
         </div>
       </div>
 
-      {/* Divider */}
-      <div className="border-t border-slate-100" />
+      {/* Hairline divider */}
+      <div className="mt-8 h-px bg-[#e8e4de]" />
 
       {/* Error for failed jobs */}
       {job.status === "failed" && job.error && (
-        <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-600">
+        <div className="mt-8 border-l-2 border-red-500 py-2 pl-4 font-['DM_Sans',sans-serif] text-sm text-red-600">
           {job.error}
         </div>
       )}
 
       {/* Pending / processing states */}
       {(job.status === "pending" || job.status === "processing") && (
-        <div className="flex items-center gap-3 py-8 text-sm text-slate-400">
-          <svg
-            className="h-4 w-4 animate-spin text-slate-400"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            />
-          </svg>
-          {job.status === "pending"
-            ? "Waiting to process..."
-            : "Transcribing..."}
+        <div className="mt-12 flex items-center gap-3 py-8">
+          <div className="h-4 w-4 animate-spin rounded-full border border-[#e8e4de] border-t-[#1a1a1a]" />
+          <span className="font-['DM_Sans',sans-serif] text-sm tracking-wide text-[#6b6560]">
+            {job.status === "pending"
+              ? "Waiting to process…"
+              : "Transcribing your recording…"}
+          </span>
         </div>
       )}
 
-      {/* Transcript content */}
+      {/* Transcript content — optimized for beautiful reading */}
       {job.status === "completed" && (
-        <div className="max-w-3xl space-y-6">
-          {/* Plain text */}
+        <div className="mt-10 max-w-3xl">
+          {/* Plain text — article-style typesetting */}
           {job.result_text && (
-            <div className="prose prose-slate prose-sm max-w-none">
-              <p className="text-base leading-relaxed text-slate-600 whitespace-pre-wrap">
+            <div className="mb-12">
+              <p className="whitespace-pre-wrap font-['Crimson_Pro',serif] text-lg leading-[1.85] text-[#1a1a1a]">
                 {job.result_text}
               </p>
             </div>
           )}
 
-          {/* Segments with timestamps */}
+          {/* Timestamped segments — editorial layout */}
           {segments && segments.length > 0 && (
-            <div className="space-y-1">
-              <h2 className="text-xs font-medium uppercase tracking-wider text-slate-400 mb-3">
-                Timestamped segments
-              </h2>
-              <div className="space-y-1.5">
+            <div>
+              <div className="mb-6 flex items-center gap-4">
+                <h2 className="font-['DM_Sans',sans-serif] text-[10px] font-medium uppercase tracking-[0.2em] text-[#6b6560]">
+                  Timestamped Transcript
+                </h2>
+                <div className="h-px flex-1 bg-[#e8e4de]" />
+              </div>
+
+              <div className="space-y-0">
                 {segments.map((seg, i) => (
-                  <div key={i} className="group flex gap-3 rounded-md px-2 py-1.5 hover:bg-slate-50 transition-colors">
-                    <span className="shrink-0 pt-0.5 font-mono text-xs text-slate-300 tabular-nums">
+                  <div
+                    key={i}
+                    className="group flex gap-6 border-b border-[#e8e4de]/50 py-3 transition-colors duration-300 last:border-b-0 hover:bg-[#f5f3ed]"
+                  >
+                    <span className="shrink-0 pt-0.5 font-['JetBrains_Mono',monospace] text-[11px] tabular-nums text-[#6b6560]/60">
                       {formatTimestamp(seg.start)}
                     </span>
-                    <span className="text-sm leading-relaxed text-slate-600">
+                    <span className="font-['Crimson_Pro',serif] text-lg leading-relaxed text-[#1a1a1a]">
                       {seg.text}
                     </span>
                   </div>

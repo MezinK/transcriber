@@ -1,13 +1,20 @@
 import { Link } from "react-router-dom";
-import type { Transcription } from "../../types";
+import type { Transcription, TranscriptionStatus } from "../../types";
 import { STATUS_LABELS } from "../../utils/status";
 import { timeAgo } from "../../utils/time";
 
-const DOT_COLORS: Record<Transcription["status"], string> = {
-  pending: "bg-gray-400",
-  processing: "bg-amber-400",
-  completed: "bg-green-500",
-  failed: "bg-red-500",
+const DOT_COLORS: Record<TranscriptionStatus, string> = {
+  pending: "bg-[#6b6560]",
+  processing: "bg-amber-500",
+  completed: "bg-[#c43e1c]",
+  failed: "bg-red-600",
+};
+
+const LABEL_COLORS: Record<TranscriptionStatus, string> = {
+  pending: "text-[#6b6560]",
+  processing: "text-amber-600",
+  completed: "text-[#c43e1c]",
+  failed: "text-red-600",
 };
 
 interface JobCardProps {
@@ -17,30 +24,38 @@ interface JobCardProps {
 
 export function JobCard({ job, onDelete }: JobCardProps) {
   return (
-    <div className="group relative border border-slate-200 rounded-lg p-4 hover:border-slate-300 hover:shadow-sm transition-all duration-150">
-      <Link to={job.id} className="absolute inset-0 z-0 rounded-lg" aria-label={`View ${job.file_name}`} />
+    <div className="group relative flex items-center justify-between py-5 transition-colors duration-300 hover:bg-[#f5f3ed]">
+      {/* Full-row click target */}
+      <Link
+        to={job.id}
+        className="absolute inset-0 z-0"
+        aria-label={`View ${job.file_name}`}
+      />
 
-      <div className="relative z-10 flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3 min-w-0">
-          {/* Status dot */}
+      {/* Left: file name + status */}
+      <div className="relative z-10 min-w-0 pl-2">
+        <p className="truncate font-['Playfair_Display',serif] text-base font-medium text-[#1a1a1a]">
+          {job.file_name}
+        </p>
+        <div className="mt-1.5 flex items-center gap-2">
           <span
-            className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${DOT_COLORS[job.status]}`}
-            title={STATUS_LABELS[job.status]}
+            className={`inline-block h-1.5 w-1.5 rounded-full ${DOT_COLORS[job.status]}`}
           />
-
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-slate-700 truncate">
-              {job.file_name}
-            </p>
-            <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
-              <span>{STATUS_LABELS[job.status]}</span>
-              <span aria-hidden="true">&middot;</span>
-              <span>{timeAgo(job.created_at)}</span>
-            </div>
-          </div>
+          <span
+            className={`font-['DM_Sans',sans-serif] text-[10px] font-medium uppercase tracking-[0.15em] ${LABEL_COLORS[job.status]}`}
+          >
+            {STATUS_LABELS[job.status]}
+          </span>
         </div>
+      </div>
 
-        {/* Delete button */}
+      {/* Right: time + delete */}
+      <div className="relative z-10 flex items-center gap-4 pr-2">
+        <span className="font-['JetBrains_Mono',monospace] text-[11px] text-[#6b6560]">
+          {timeAgo(job.created_at)}
+        </span>
+
+        {/* Delete × button — appears on hover */}
         <button
           type="button"
           onClick={(e) => {
@@ -48,20 +63,20 @@ export function JobCard({ job, onDelete }: JobCardProps) {
             e.stopPropagation();
             onDelete(job.id);
           }}
-          className="relative z-20 shrink-0 rounded p-1 text-slate-300 opacity-0 transition-opacity duration-150 hover:bg-slate-100 hover:text-slate-500 group-hover:opacity-100 focus:opacity-100"
+          className="relative z-20 flex h-6 w-6 items-center justify-center text-[#6b6560]/0 transition-all duration-300 hover:text-[#c43e1c] group-hover:text-[#6b6560] focus:text-[#6b6560]"
           aria-label={`Delete ${job.file_name}`}
         >
           <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            className="h-4 w-4"
+            width="10"
+            height="10"
+            viewBox="0 0 10 10"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            strokeLinecap="round"
           >
-            <path
-              fillRule="evenodd"
-              d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z"
-              clipRule="evenodd"
-            />
+            <line x1="1" y1="1" x2="9" y2="9" />
+            <line x1="9" y1="1" x2="1" y2="9" />
           </svg>
         </button>
       </div>

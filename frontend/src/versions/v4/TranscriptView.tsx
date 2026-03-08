@@ -10,18 +10,19 @@ interface Segment {
   text: string;
 }
 
-const STATUS_ACCENT: Record<TranscriptionStatus, string> = {
-  pending: "text-sky-400",
-  processing: "text-amber-400",
-  completed: "text-emerald-400",
-  failed: "text-red-400",
+/* ---------- Status mappings ---------- */
+const STATUS_DOT: Record<TranscriptionStatus, string> = {
+  pending: "bg-[#5a5a70]",
+  processing: "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]",
+  completed: "bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.5)]",
+  failed: "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]",
 };
 
-const STATUS_DOT: Record<TranscriptionStatus, string> = {
-  pending: "bg-sky-400",
-  processing: "bg-amber-400",
-  completed: "bg-emerald-400",
-  failed: "bg-red-400",
+const STATUS_TEXT: Record<TranscriptionStatus, string> = {
+  pending: "text-[#5a5a70]",
+  processing: "text-amber-400",
+  completed: "text-cyan-400",
+  failed: "text-red-400",
 };
 
 function formatTimestamp(seconds: number): string {
@@ -49,20 +50,21 @@ export function TranscriptView() {
   /* ---- Loading skeleton ---- */
   if (loading) {
     return (
-      <div className="animate-pulse space-y-6">
-        <div className="h-4 w-20 rounded bg-zinc-800" />
-        <div className="rounded-lg bg-zinc-900 p-8">
-          <div className="h-6 w-64 rounded bg-zinc-800" />
-          <div className="mt-3 flex gap-3">
-            <div className="h-5 w-20 rounded-full bg-zinc-800" />
-            <div className="h-5 w-32 rounded bg-zinc-800/60" />
+      <div className="animate-pulse space-y-8">
+        <div className="h-4 w-24 rounded bg-white/[0.04]" />
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-8 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
+          <div className="h-8 w-72 rounded bg-white/[0.04]" />
+          <div className="mt-4 flex gap-3">
+            <div className="h-5 w-20 rounded-full bg-white/[0.04]" />
+            <div className="h-5 w-36 rounded bg-white/[0.03]" />
           </div>
+          <div className="mt-8 h-[1px] w-full bg-gradient-to-r from-cyan-400/20 via-violet-500/20 to-transparent" />
           <div className="mt-8 space-y-3">
-            <div className="h-4 w-full rounded bg-zinc-800/50" />
-            <div className="h-4 w-5/6 rounded bg-zinc-800/50" />
-            <div className="h-4 w-4/6 rounded bg-zinc-800/50" />
-            <div className="h-4 w-full rounded bg-zinc-800/50" />
-            <div className="h-4 w-3/4 rounded bg-zinc-800/50" />
+            <div className="h-4 w-full rounded bg-white/[0.03]" />
+            <div className="h-4 w-5/6 rounded bg-white/[0.03]" />
+            <div className="h-4 w-4/6 rounded bg-white/[0.03]" />
+            <div className="h-4 w-full rounded bg-white/[0.03]" />
+            <div className="h-4 w-3/4 rounded bg-white/[0.03]" />
           </div>
         </div>
       </div>
@@ -72,16 +74,16 @@ export function TranscriptView() {
   /* ---- Error / not found ---- */
   if (error || !job) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
         <Link
           to="/4"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-300"
+          className="group inline-flex items-center gap-1.5 font-['Outfit',sans-serif] text-sm font-normal text-[#5a5a70] transition-colors duration-300 hover:text-cyan-400"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 20 20"
             fill="currentColor"
-            className="h-4 w-4"
+            className="h-4 w-4 transition-transform duration-300 group-hover:-translate-x-0.5"
           >
             <path
               fillRule="evenodd"
@@ -92,8 +94,8 @@ export function TranscriptView() {
           Back
         </Link>
 
-        <div className="flex flex-col items-center rounded-lg border border-zinc-800 bg-zinc-900 px-8 py-16">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-red-500/10">
+        <div className="flex flex-col items-center rounded-2xl border border-white/[0.06] bg-white/[0.03] px-8 py-16 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/[0.08]">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 20 20"
@@ -107,7 +109,7 @@ export function TranscriptView() {
               />
             </svg>
           </div>
-          <p className="text-sm font-medium text-zinc-300">
+          <p className="font-['DM_Sans',sans-serif] text-sm text-[#f0f0f5]/70">
             {error ?? "Transcription not found"}
           </p>
         </div>
@@ -123,17 +125,17 @@ export function TranscriptView() {
       : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Back link */}
       <Link
         to="/4"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-300"
+        className="group inline-flex items-center gap-1.5 font-['Outfit',sans-serif] text-sm font-normal text-[#5a5a70] transition-colors duration-300 hover:text-cyan-400"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 20 20"
           fill="currentColor"
-          className="h-4 w-4"
+          className="h-4 w-4 transition-transform duration-300 group-hover:-translate-x-0.5"
         >
           <path
             fillRule="evenodd"
@@ -144,68 +146,58 @@ export function TranscriptView() {
         Back to transcriptions
       </Link>
 
-      {/* Main card */}
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8">
+      {/* Main glass card */}
+      <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-8 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
         {/* ---- Header ---- */}
-        <div className="space-y-3">
-          <h1 className="text-lg font-semibold tracking-tight text-zinc-100">
+        <div className="space-y-4">
+          <h1 className="font-['Outfit',sans-serif] text-3xl font-light tracking-tight text-[#f0f0f5]">
             {job.file_name}
           </h1>
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            {/* Status indicator */}
-            <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${STATUS_ACCENT[job.status]}`}>
-              <span className={`inline-block h-1.5 w-1.5 rounded-full ${STATUS_DOT[job.status]} ${job.status === "processing" ? "animate-pulse" : ""}`} />
+          <div className="flex flex-wrap items-center gap-4 text-sm">
+            {/* Status badge */}
+            <span className={`inline-flex items-center gap-2 text-xs font-medium ${STATUS_TEXT[job.status]}`}>
+              <span
+                className={`
+                  inline-block h-1.5 w-1.5 rounded-full
+                  ${STATUS_DOT[job.status]}
+                  ${job.status === "processing" ? "animate-pulse" : ""}
+                `}
+              />
               {STATUS_LABELS[job.status]}
             </span>
-            <span className="text-zinc-600">
+
+            <span className="font-['JetBrains_Mono',monospace] text-xs text-[#5a5a70]">
               {formatDate(job.created_at)}
             </span>
+
             {job.media_type && (
-              <span className="inline-flex items-center rounded-md bg-zinc-800 px-2 py-0.5 text-xs font-medium text-zinc-500">
+              <span className="rounded-md border border-white/[0.06] bg-white/[0.03] px-2 py-0.5 font-['JetBrains_Mono',monospace] text-xs text-[#5a5a70]">
                 {job.media_type}
               </span>
             )}
           </div>
         </div>
 
-        {/* Divider */}
-        <div className="my-6 border-t border-zinc-800" />
+        {/* Gradient divider */}
+        <div className="my-7 h-[1px] bg-gradient-to-r from-cyan-400/30 via-violet-500/20 to-transparent" />
 
         {/* ---- Failed ---- */}
         {job.status === "failed" && job.error && (
-          <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-5 py-4 text-sm text-red-400">
+          <div className="rounded-xl border border-red-500/20 bg-red-500/[0.04] px-5 py-4 font-['DM_Sans',sans-serif] text-sm text-red-400">
             {job.error}
           </div>
         )}
 
-        {/* ---- Pending / processing ---- */}
+        {/* ---- Pending / Processing ---- */}
         {(job.status === "pending" || job.status === "processing") && (
-          <div className="flex items-center gap-3 py-12 text-sm">
-            <svg
-              className="h-5 w-5 animate-spin text-zinc-400"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
-            <span className="font-medium text-zinc-400">
-              {job.status === "pending"
-                ? "Waiting to process..."
-                : "Transcribing your file..."}
-            </span>
+          <div className="flex flex-col items-center gap-5 py-16">
+            {/* Animated gradient line */}
+            <div className="relative h-[2px] w-48 overflow-hidden rounded-full bg-white/[0.04]">
+              <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-transparent via-cyan-400 to-transparent" />
+            </div>
+            <p className="font-['Outfit',sans-serif] text-sm font-normal italic text-[#5a5a70]">
+              {job.status === "pending" ? "Queued for transcription..." : "Transcribing..."}
+            </p>
           </div>
         )}
 
@@ -214,7 +206,7 @@ export function TranscriptView() {
           <div className="space-y-8">
             {/* Plain text */}
             {job.result_text && (
-              <p className="whitespace-pre-wrap text-base leading-relaxed text-zinc-200">
+              <p className="whitespace-pre-wrap font-['DM_Sans',sans-serif] text-base leading-relaxed text-[#f0f0f5]">
                 {job.result_text}
               </p>
             )}
@@ -222,19 +214,19 @@ export function TranscriptView() {
             {/* Segments with timestamps */}
             {segments && segments.length > 0 && (
               <div className="space-y-4">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                <h2 className="font-['Outfit',sans-serif] text-xs font-medium uppercase tracking-[0.2em] text-[#5a5a70]">
                   Timestamped Segments
                 </h2>
                 <div className="space-y-0.5">
                   {segments.map((seg, i) => (
                     <div
                       key={i}
-                      className="group flex gap-4 rounded-md px-3 py-2 transition-colors hover:bg-zinc-800/50"
+                      className="group flex gap-4 rounded-xl border-l-2 border-l-transparent px-4 py-2.5 transition-all duration-300 hover:border-l-cyan-400/40 hover:bg-white/[0.02]"
                     >
-                      <span className="flex-shrink-0 pt-0.5 font-mono text-sm tabular-nums text-zinc-600">
+                      <span className="flex-shrink-0 pt-0.5 font-['JetBrains_Mono',monospace] text-sm tabular-nums text-cyan-400/50 transition-colors duration-300 group-hover:text-cyan-400/80">
                         {formatTimestamp(seg.start)}
                       </span>
-                      <span className="text-sm leading-relaxed text-zinc-300">
+                      <span className="font-['DM_Sans',sans-serif] text-sm leading-relaxed text-[#f0f0f5]/80 transition-colors duration-300 group-hover:text-[#f0f0f5]">
                         {seg.text}
                       </span>
                     </div>

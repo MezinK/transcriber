@@ -2,25 +2,53 @@ import { useTranscriptions } from "../../hooks/useTranscriptions";
 import { useDeleteJob } from "../../hooks/useDeleteJob";
 import { JobRow } from "./JobRow";
 
+/* ---------- Hexagonal empty-state icon ---------- */
+function EmptyIcon() {
+  return (
+    <svg
+      viewBox="0 0 48 48"
+      fill="none"
+      className="h-12 w-12"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M24 4L42.19 14.5V31.5L24 44L5.81 31.5V14.5L24 4Z"
+        stroke="#5a5a70"
+        strokeWidth="1"
+        strokeLinejoin="round"
+        opacity="0.4"
+      />
+      <path
+        d="M24 16L32 24L24 32L16 24L24 16Z"
+        stroke="#5a5a70"
+        strokeWidth="1"
+        strokeLinejoin="round"
+        opacity="0.25"
+      />
+    </svg>
+  );
+}
+
 export function JobList() {
   const { jobs, loading, error, refresh } = useTranscriptions();
   const { deleteJob } = useDeleteJob(refresh);
 
-  /* ---- Loading skeletons ---- */
+  /* ---- Loading skeletons — glass shimmers ---- */
   if (loading && jobs.length === 0) {
     return (
-      <div className="space-y-2">
-        {[...Array(4)].map((_, i) => (
+      <div className="space-y-3">
+        {[...Array(3)].map((_, i) => (
           <div
             key={i}
-            className="animate-pulse rounded-lg border-l-4 border-l-zinc-800 bg-zinc-900 px-5 py-4"
+            className="animate-pulse rounded-2xl border border-white/[0.04] bg-white/[0.02] px-5 py-4 backdrop-blur-xl"
           >
             <div className="flex items-center gap-4">
-              <div className="h-9 w-9 rounded-md bg-zinc-800" />
+              <div className="h-2 w-2 rounded-full bg-white/[0.06]" />
               <div className="flex-1 space-y-2">
-                <div className="h-4 w-2/3 rounded bg-zinc-800" />
-                <div className="h-3 w-1/3 rounded bg-zinc-800/60" />
+                <div className="h-3.5 w-2/3 rounded bg-white/[0.04]" />
+                <div className="h-3 w-1/3 rounded bg-white/[0.03]" />
               </div>
+              <div className="h-3 w-12 rounded bg-white/[0.03]" />
             </div>
           </div>
         ))}
@@ -31,12 +59,12 @@ export function JobList() {
   /* ---- Error state ---- */
   if (error) {
     return (
-      <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-6 py-5 text-center">
-        <p className="text-sm font-medium text-red-400">{error}</p>
+      <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.04] px-6 py-5 text-center backdrop-blur-xl">
+        <p className="font-['DM_Sans',sans-serif] text-sm text-red-400">{error}</p>
         <button
           type="button"
           onClick={refresh}
-          className="mt-2 text-xs font-medium text-red-400/70 underline decoration-red-500/30 underline-offset-2 transition-colors hover:text-red-300"
+          className="mt-2 font-['DM_Sans',sans-serif] text-xs text-red-400/70 underline decoration-red-500/30 underline-offset-2 transition-colors duration-300 hover:text-red-300"
         >
           Try again
         </button>
@@ -47,28 +75,15 @@ export function JobList() {
   /* ---- Empty state ---- */
   if (jobs.length === 0) {
     return (
-      <div className="flex flex-col items-center rounded-lg border border-zinc-800 bg-zinc-900/50 px-8 py-16">
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-800">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
-            stroke="currentColor"
-            className="h-6 w-6 text-zinc-600"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
-            />
-          </svg>
+      <div className="flex flex-col items-center rounded-2xl border border-white/[0.06] bg-white/[0.02] px-8 py-16 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
+        <div className="mb-5">
+          <EmptyIcon />
         </div>
-        <p className="text-sm font-medium text-zinc-400">
+        <p className="font-['Outfit',sans-serif] text-sm font-light tracking-wide text-[#5a5a70]">
           No transcriptions yet
         </p>
-        <p className="mt-1 text-xs text-zinc-600">
-          Upload a file to get started
+        <p className="mt-1.5 font-['DM_Sans',sans-serif] text-xs text-[#5a5a70]/60">
+          Upload a recording to get started
         </p>
       </div>
     );

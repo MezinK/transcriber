@@ -1,7 +1,8 @@
 import { Link, useParams } from "react-router-dom";
 import { useTranscription } from "../../hooks/useTranscription";
-import { STATUS_BG, STATUS_LABELS } from "../../utils/status";
+import { STATUS_LABELS } from "../../utils/status";
 import { formatDate } from "../../utils/time";
+import type { TranscriptionStatus } from "../../types";
 
 interface Segment {
   start: number;
@@ -27,6 +28,29 @@ function isSegmentArray(value: unknown): value is Segment[] {
   );
 }
 
+const STATUS_PILL: Record<TranscriptionStatus, string> = {
+  pending: "bg-[#33261c]/[0.06] text-[#8c7a6b]",
+  processing: "bg-[#b45309]/10 text-[#b45309]",
+  completed: "bg-[#15803d]/10 text-[#15803d]",
+  failed: "bg-[#b91c1c]/10 text-[#b91c1c]",
+};
+
+/* Small ornamental divider */
+function OrnamentDivider() {
+  return (
+    <div className="flex items-center justify-center py-6">
+      <svg viewBox="0 0 120 16" fill="none" className="h-4 w-[120px] text-[#e8ddd0]">
+        <line x1="0" y1="8" x2="48" y2="8" stroke="currentColor" strokeWidth="1" />
+        <path
+          d="M56 8 L60 4 L64 8 L60 12 Z"
+          fill="currentColor"
+        />
+        <line x1="72" y1="8" x2="120" y2="8" stroke="currentColor" strokeWidth="1" />
+      </svg>
+    </div>
+  );
+}
+
 export function TranscriptView() {
   const { id } = useParams<{ id: string }>();
   const { job, loading, error } = useTranscription(id);
@@ -34,23 +58,21 @@ export function TranscriptView() {
   /* ---- Loading skeleton ---- */
   if (loading) {
     return (
-      <div className="animate-pulse space-y-6">
-        {/* Back link placeholder */}
-        <div className="h-5 w-24 rounded bg-stone-100" />
-
-        {/* Card skeleton */}
-        <div className="rounded-xl bg-white p-8 shadow-sm ring-1 ring-stone-950/5">
-          <div className="h-6 w-72 rounded-md bg-stone-100" />
-          <div className="mt-3 flex gap-3">
-            <div className="h-5 w-20 rounded-full bg-stone-100" />
-            <div className="h-5 w-36 rounded bg-stone-50" />
+      <div className="animate-pulse space-y-8">
+        <div className="h-5 w-36 rounded-lg bg-[#33261c]/[0.04]" />
+        <div className="rounded-2xl border border-[#e8ddd0] bg-[#fffcf7] p-8 sm:p-10">
+          <div className="h-8 w-72 rounded-lg bg-[#33261c]/[0.04]" />
+          <div className="mt-4 flex gap-3">
+            <div className="h-5 w-20 rounded-full bg-[#33261c]/[0.04]" />
+            <div className="h-5 w-40 rounded bg-[#33261c]/[0.03]" />
           </div>
-          <div className="mt-8 space-y-3">
-            <div className="h-4 w-full rounded bg-stone-50" />
-            <div className="h-4 w-5/6 rounded bg-stone-50" />
-            <div className="h-4 w-4/6 rounded bg-stone-50" />
-            <div className="h-4 w-full rounded bg-stone-50" />
-            <div className="h-4 w-3/4 rounded bg-stone-50" />
+          <div className="my-8 h-px bg-[#e8ddd0]" />
+          <div className="space-y-4">
+            <div className="h-4 w-full rounded bg-[#33261c]/[0.03]" />
+            <div className="h-4 w-5/6 rounded bg-[#33261c]/[0.03]" />
+            <div className="h-4 w-4/6 rounded bg-[#33261c]/[0.03]" />
+            <div className="h-4 w-full rounded bg-[#33261c]/[0.03]" />
+            <div className="h-4 w-3/4 rounded bg-[#33261c]/[0.03]" />
           </div>
         </div>
       </div>
@@ -60,33 +82,21 @@ export function TranscriptView() {
   /* ---- Error / not found ---- */
   if (error || !job) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
         <Link
           to="/3"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-stone-500 transition-colors hover:text-blue-600"
+          className="inline-flex items-center gap-2 font-['DM_Sans',sans-serif] text-sm font-medium text-[#8c7a6b] transition-colors duration-200 hover:text-[#b45309]"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            className="h-4 w-4"
-          >
-            <path
-              fillRule="evenodd"
-              d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z"
-              clipRule="evenodd"
-            />
-          </svg>
-          Back
+          <span className="text-base">{"\u2190"}</span>
+          All transcriptions
         </Link>
 
-        <div className="flex flex-col items-center rounded-xl bg-white px-8 py-16 shadow-sm ring-1 ring-stone-950/5">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
+        <div className="flex flex-col items-center rounded-2xl border border-[#e8ddd0] bg-[#fffcf7] px-8 py-20 shadow-[0_2px_16px_rgba(51,38,28,0.04)]">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#b91c1c]/5">
             <svg
-              xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 20 20"
               fill="currentColor"
-              className="h-6 w-6 text-red-400"
+              className="h-6 w-6 text-[#b91c1c]/60"
             >
               <path
                 fillRule="evenodd"
@@ -95,7 +105,7 @@ export function TranscriptView() {
               />
             </svg>
           </div>
-          <p className="text-sm font-medium text-stone-700">
+          <p className="font-['DM_Sans',sans-serif] text-sm font-medium text-[#33261c]">
             {error ?? "Transcription not found"}
           </p>
         </div>
@@ -111,120 +121,112 @@ export function TranscriptView() {
       : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Back link */}
       <Link
         to="/3"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-stone-500 transition-colors hover:text-blue-600"
+        className="inline-flex items-center gap-2 font-['DM_Sans',sans-serif] text-sm font-medium text-[#8c7a6b] transition-colors duration-200 hover:text-[#b45309]"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          className="h-4 w-4"
-        >
-          <path
-            fillRule="evenodd"
-            d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z"
-            clipRule="evenodd"
-          />
-        </svg>
-        Back to transcriptions
+        <span className="text-base">{"\u2190"}</span>
+        All transcriptions
       </Link>
 
       {/* Main card */}
-      <div className="rounded-xl bg-white p-8 shadow-sm ring-1 ring-stone-950/5">
+      <div className="rounded-2xl border border-[#e8ddd0] bg-[#fffcf7] p-8 shadow-[0_4px_30px_rgba(51,38,28,0.06)] sm:p-10">
         {/* ---- Header ---- */}
-        <div className="space-y-3">
-          <h1 className="text-lg font-semibold tracking-tight text-stone-800">
+        <div className="space-y-4">
+          <h1 className="font-['Fraunces',serif] text-3xl font-normal text-[#33261c]">
             {job.file_name}
           </h1>
-          <div className="flex flex-wrap items-center gap-3 text-sm">
+          <div className="flex flex-wrap items-center gap-3">
             <span
-              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BG[job.status]}`}
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-['DM_Sans',sans-serif] text-xs font-medium ${STATUS_PILL[job.status]}`}
             >
               {STATUS_LABELS[job.status]}
             </span>
-            <span className="text-stone-400">
+            <span className="font-['DM_Sans',sans-serif] text-sm text-[#8c7a6b]">
               {formatDate(job.created_at)}
             </span>
-            {job.media_type && (
-              <span className="inline-flex items-center rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-500">
-                {job.media_type}
-              </span>
-            )}
           </div>
         </div>
 
-        {/* Divider */}
-        <div className="my-6 border-t border-stone-100" />
+        {/* Ornamental divider */}
+        <OrnamentDivider />
 
         {/* ---- Failed ---- */}
         {job.status === "failed" && job.error && (
-          <div className="rounded-lg bg-red-50 px-5 py-4 text-sm text-red-600">
-            {job.error}
+          <div className="rounded-xl bg-[#b91c1c]/5 px-5 py-4">
+            <p className="font-['DM_Sans',sans-serif] text-sm text-[#b91c1c]">
+              {job.error}
+            </p>
           </div>
         )}
 
         {/* ---- Pending / processing ---- */}
         {(job.status === "pending" || job.status === "processing") && (
-          <div className="flex items-center gap-3 py-12 text-sm text-stone-400">
+          <div className="flex flex-col items-center py-16">
+            {/* Warm amber spinner */}
             <svg
-              className="h-5 w-5 animate-spin text-blue-500"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
+              className="h-8 w-8 animate-spin text-[#b45309]"
               viewBox="0 0 24 24"
+              fill="none"
             >
               <circle
-                className="opacity-25"
                 cx="12"
                 cy="12"
                 r="10"
                 stroke="currentColor"
-                strokeWidth="4"
+                strokeWidth="2"
+                className="opacity-20"
               />
               <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                d="M12 2a10 10 0 0 1 10 10"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
               />
             </svg>
-            <span className="font-medium text-stone-500">
+            <p className="mt-5 font-['Fraunces',serif] text-lg italic text-[#8c7a6b]">
               {job.status === "pending"
-                ? "Waiting to process..."
-                : "Transcribing your file..."}
-            </span>
+                ? "Waiting to begin\u2026"
+                : "Transcribing your recording\u2026"}
+            </p>
+            <p className="mt-2 font-['DM_Sans',sans-serif] text-xs text-[#8c7a6b]/60">
+              This may take a moment
+            </p>
           </div>
         )}
 
         {/* ---- Completed transcript ---- */}
         {job.status === "completed" && (
-          <div className="space-y-8">
+          <div className="space-y-10">
             {/* Plain text */}
             {job.result_text && (
-              <div>
-                <p className="whitespace-pre-wrap text-base leading-relaxed text-stone-700">
-                  {job.result_text}
-                </p>
-              </div>
+              <p className="whitespace-pre-wrap font-['DM_Sans',sans-serif] text-base leading-[1.9] text-[#33261c]">
+                {job.result_text}
+              </p>
             )}
 
             {/* Segments with timestamps */}
             {segments && segments.length > 0 && (
-              <div className="space-y-4">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-                  Timestamped Segments
-                </h2>
+              <div className="space-y-5">
+                <div className="flex items-center gap-3">
+                  <div className="h-px flex-1 bg-[#e8ddd0]" />
+                  <span className="font-['DM_Sans',sans-serif] text-[10px] font-semibold uppercase tracking-[0.15em] text-[#8c7a6b]/60">
+                    Timestamped Segments
+                  </span>
+                  <div className="h-px flex-1 bg-[#e8ddd0]" />
+                </div>
                 <div className="space-y-1">
                   {segments.map((seg, i) => (
                     <div
                       key={i}
-                      className="group flex gap-4 rounded-lg px-3 py-2 transition-colors hover:bg-stone-50"
+                      className="group/seg flex gap-4 rounded-lg border-l-[3px] border-transparent px-4 py-2.5 transition-all duration-200 hover:border-l-[#b45309] hover:bg-[#f8f0e3]/50"
                     >
-                      <span className="flex-shrink-0 pt-0.5 font-mono text-xs tabular-nums text-stone-300">
+                      <span className="flex-shrink-0 pt-0.5 font-['JetBrains_Mono',monospace] text-xs tabular-nums text-[#8c7a6b]/50">
                         {formatTimestamp(seg.start)}
                       </span>
-                      <span className="text-sm leading-relaxed text-stone-600">
+                      <span className="font-['DM_Sans',sans-serif] text-[15px] leading-relaxed text-[#33261c]/90">
                         {seg.text}
                       </span>
                     </div>

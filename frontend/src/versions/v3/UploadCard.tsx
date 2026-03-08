@@ -54,58 +54,78 @@ export function UploadCard({ onSuccess }: UploadCardProps) {
         }
       }}
       className={`
-        group relative overflow-hidden rounded-xl bg-white shadow-sm
-        border-2 border-dashed transition-all duration-300 ease-out
+        group relative overflow-hidden rounded-2xl
+        transition-all duration-300 ease-out
         ${
           dragActive
-            ? "border-blue-400 bg-blue-50/40 shadow-md shadow-blue-100/50 scale-[1.01]"
-            : "border-stone-200 hover:border-blue-300 hover:shadow-md"
+            ? "border-2 border-[#b45309] bg-[#f8f0e3] shadow-[0_4px_30px_rgba(51,38,28,0.12)]"
+            : "border-2 border-dashed border-[#e8ddd0] bg-[#fffcf7] shadow-[0_4px_30px_rgba(51,38,28,0.06)] hover:border-[#b45309]/50 hover:shadow-[0_4px_30px_rgba(51,38,28,0.1)]"
         }
         ${uploading ? "pointer-events-none" : "cursor-pointer"}
+        ${!uploading && !dragActive ? "animate-[breathe_4s_ease-in-out_infinite]" : ""}
       `}
     >
-      <div className="flex flex-col items-center justify-center px-8 py-14">
-        {/* Cloud upload icon */}
+      {/* Subtle paper texture overlay */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+        }}
+      />
+
+      <div className="flex flex-col items-center justify-center px-8 py-16 sm:py-20">
+        {/* Feather / upload icon — thin, elegant */}
         <div
           className={`
-            mb-5 flex h-16 w-16 items-center justify-center rounded-2xl
+            mb-6 flex h-16 w-16 items-center justify-center rounded-2xl
             transition-all duration-300 ease-out
             ${
               dragActive
-                ? "bg-blue-100 scale-110"
-                : "bg-stone-100 group-hover:bg-blue-50 group-hover:scale-105"
+                ? "bg-[#b45309]/10 scale-110"
+                : "bg-[#33261c]/[0.04] group-hover:bg-[#b45309]/10 group-hover:scale-105"
             }
           `}
         >
           <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
             viewBox="0 0 24 24"
-            strokeWidth={1.5}
+            fill="none"
+            strokeWidth={1.2}
             stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
             className={`
               h-8 w-8 transition-all duration-300
               ${
                 dragActive
-                  ? "text-blue-500 -translate-y-0.5"
-                  : "text-stone-400 group-hover:text-blue-500"
+                  ? "text-[#b45309] -translate-y-1"
+                  : "text-[#8c7a6b] group-hover:text-[#b45309] group-hover:-translate-y-0.5"
               }
             `}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.338-2.32 3.75 3.75 0 013.572 5.408A4.5 4.5 0 0118 19.5H6.75z"
-            />
+            {/* Feather quill icon */}
+            <path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z" />
+            <line x1="16" y1="8" x2="2" y2="22" />
+            <line x1="17.5" y1="15" x2="9" y2="15" />
           </svg>
         </div>
 
-        <p className="text-base font-medium text-stone-700">
-          {dragActive ? "Drop your file here" : "Drop your file here or click to browse"}
+        <p className="font-['Fraunces',serif] text-xl italic text-[#33261c]">
+          {dragActive ? "Let it go" : "Share your recording"}
         </p>
-        <p className="mt-2 text-sm text-stone-400">
-          Supports audio and video files
+        <p className="mt-2.5 font-['DM_Sans',sans-serif] text-sm text-[#8c7a6b]">
+          Drop an audio or video file here, or click to browse
         </p>
+
+        {/* Small decorative ornament */}
+        <svg
+          viewBox="0 0 60 12"
+          fill="none"
+          className="mt-6 h-3 w-[60px] text-[#e8ddd0]"
+        >
+          <circle cx="30" cy="6" r="2" fill="currentColor" />
+          <line x1="6" y1="6" x2="24" y2="6" stroke="currentColor" strokeWidth="1" />
+          <line x1="36" y1="6" x2="54" y2="6" stroke="currentColor" strokeWidth="1" />
+        </svg>
 
         <input
           ref={inputRef}
@@ -118,16 +138,19 @@ export function UploadCard({ onSuccess }: UploadCardProps) {
 
       {/* Progress bar */}
       {uploading && progress && (
-        <div className="border-t border-stone-100 px-8 py-5">
-          <div className="mb-3 h-2 w-full overflow-hidden rounded-full bg-stone-100">
+        <div className="border-t border-[#e8ddd0] bg-[#fffcf7] px-8 py-5">
+          <div className="mb-3 h-2 w-full overflow-hidden rounded-full bg-[#e8ddd0]/60">
             <div
-              className="h-full rounded-full bg-blue-500 transition-all duration-500 ease-out"
+              className="h-full rounded-full bg-[#b45309] transition-all duration-500 ease-out"
               style={{ width: `${progress.percent}%` }}
             />
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-stone-600">
-              Uploading... {progress.percent}%
+            <span className="font-['DM_Sans',sans-serif] text-sm font-medium text-[#33261c]">
+              Uploading{"\u2026"}{" "}
+              <span className="font-['JetBrains_Mono',monospace] text-xs text-[#8c7a6b]">
+                {progress.percent}%
+              </span>
             </span>
             <button
               type="button"
@@ -135,7 +158,7 @@ export function UploadCard({ onSuccess }: UploadCardProps) {
                 e.stopPropagation();
                 cancel();
               }}
-              className="text-sm text-stone-400 transition-colors hover:text-red-500"
+              className="font-['DM_Sans',sans-serif] text-sm text-[#8c7a6b] transition-colors duration-200 hover:text-[#b91c1c]"
             >
               Cancel
             </button>
@@ -145,8 +168,8 @@ export function UploadCard({ onSuccess }: UploadCardProps) {
 
       {/* Error */}
       {error && (
-        <div className="border-t border-red-100 bg-red-50/50 px-8 py-4">
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="border-t border-[#b91c1c]/10 bg-[#b91c1c]/5 px-8 py-4">
+          <p className="font-['DM_Sans',sans-serif] text-sm text-[#b91c1c]">{error}</p>
         </div>
       )}
     </div>
