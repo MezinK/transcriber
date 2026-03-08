@@ -17,6 +17,18 @@ export interface SegmentsData {
   segments: Segment[];
 }
 
+export interface Speaker {
+  speaker_key: string;
+  display_name: string;
+}
+
+export interface Turn {
+  speaker_key: string;
+  start: number;
+  end: number;
+  text: string;
+}
+
 export interface Transcription {
   id: string;
   source_filename: string;
@@ -27,8 +39,8 @@ export interface Transcription {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
-  transcript_text: string | null;
-  segments_json: SegmentsData | null;
+  speakers: Speaker[] | null;
+  turns: Turn[] | null;
 }
 
 export interface TranscriptionListResponse {

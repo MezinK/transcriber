@@ -40,6 +40,9 @@ class FakeSession:
         scalar = self.scalars.pop(0) if self.scalars else None
         return FakeResult(scalar)
 
+    async def get(self, model, ident, with_for_update=False):
+        return None
+
     def add(self, instance: object) -> None:
         self.added.append(instance)
 
@@ -203,16 +206,34 @@ async def test_complete_transcription_writes_artifacts_and_cleans_up_after_commi
         session_factory=FakeSessionFactory(session),
         transcription_id=transcription.id,
         worker_id=worker_id,
-        transcript_text="hello world",
         segments_json={"segments": [{"text": "hello world"}]},
+        speakers_json=[{"speaker_key": "speaker_0", "display_name": "Speaker 1"}],
+        turns_json=[
+            {
+                "speaker_key": "speaker_0",
+                "start": 0.0,
+                "end": 1.0,
+                "text": "hello world",
+            }
+        ],
         upload_dir="/tmp/uploads",
         now_factory=lambda: now,
     )
 
     assert transcription.status == TranscriptionStatus.COMPLETED
     assert transcription.completed_at == now
-    assert artifact.transcript_text == "hello world"
     assert artifact.segments_json == {"segments": [{"text": "hello world"}]}
+    assert artifact.speakers_json == [
+        {"speaker_key": "speaker_0", "display_name": "Speaker 1"}
+    ]
+    assert artifact.turns_json == [
+        {
+            "speaker_key": "speaker_0",
+            "start": 0.0,
+            "end": 1.0,
+            "text": "hello world",
+        }
+    ]
     assert removed_paths == [(Path("/tmp/uploads"), Path(artifact.upload_path))]
 
 
@@ -332,13 +353,15 @@ async def test_complete_transcription_does_not_cleanup_when_commit_fails(
             session_factory=FakeSessionFactory(session),
             transcription_id=transcription.id,
             worker_id=worker_id,
-            transcript_text="hello world",
             segments_json=None,
+            speakers_json=None,
+            turns_json=None,
             upload_dir="/tmp/uploads",
         )
 
     assert transcription.status == TranscriptionStatus.COMPLETED
-    assert artifact.transcript_text == "hello world"
+    assert artifact.speakers_json is None
+    assert artifact.turns_json is None
     assert removed_paths == []
 
 

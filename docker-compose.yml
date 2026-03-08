@@ -22,8 +22,9 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    expose:
-      - "8000"
+      target: backend-api
+    ports:
+      - "8000:8000"
     environment:
       DATABASE_URL: "postgresql+asyncpg://app:app@postgres:5432/transcriptions"
       UPLOAD_DIR: /uploads
@@ -36,14 +37,21 @@ services:
         condition: service_completed_successfully
 
   worker:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: backend/Dockerfile
+      target: backend-worker
     environment:
       DATABASE_URL: "postgresql+asyncpg://app:app@postgres:5432/transcriptions"
       UPLOAD_DIR: /uploads
-      TRANSCRIPTION_ENGINE: faster-whisper
-      WHISPER_MODEL: base
+      TRANSCRIPTION_BACKEND: whisperx
+      WHISPER_MODEL: ${WHISPER_MODEL:-base}
+      WHISPER_DEVICE: ${WHISPER_DEVICE:-cpu}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8}
+      WHISPER_BATCH_SIZE: ${WHISPER_BATCH_SIZE:-4}
+      WHISPER_DIARIZATION_ENABLED: ${WHISPER_DIARIZATION_ENABLED:-false}
+      HF_TOKEN: ${HF_TOKEN:-}
     command: ["python", "-m", "worker.main"]
     volumes:
       - uploads:/uploads
@@ -59,6 +67,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+      target: backend-api
     environment:
       DATABASE_URL: "postgresql+asyncpg://app:app@postgres:5432/transcriptions"
       UPLOAD_DIR: /uploads

@@ -11,9 +11,11 @@ import psycopg
 from psycopg import sql
 import pytest
 import pytest_asyncio
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = BACKEND_ROOT.parent
 ALEMBIC_INI = BACKEND_ROOT / "alembic.ini"
 POSTGRES_IMAGE = "postgres:17"
 
@@ -24,10 +26,16 @@ class PostgresTestDatabase:
     sync_database_url: str
 
 
+@dataclass
+class DatabaseHarness:
+    session_factory: async_sessionmaker
+    async_engine: AsyncEngine
+
+
 def _run_command(*args: str) -> str:
     result = subprocess.run(
         args,
-        cwd=BACKEND_ROOT,
+        cwd=REPO_ROOT,
         check=True,
         capture_output=True,
         text=True,
@@ -60,7 +68,7 @@ def _start_postgres_container() -> tuple[str, int]:
 def _stop_postgres_container(container_name: str) -> None:
     subprocess.run(
         ["docker", "rm", "-f", container_name],
-        cwd=BACKEND_ROOT,
+        cwd=REPO_ROOT,
         check=False,
         capture_output=True,
         text=True,
@@ -149,3 +157,19 @@ async def session_factory(postgres_database: PostgresTestDatabase):
         yield async_sessionmaker(engine, expire_on_commit=False)
     finally:
         await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def database(postgres_database: PostgresTestDatabase) -> Iterator[DatabaseHarness]:
+    async_engine = create_async_engine(
+        postgres_database.database_url,
+        pool_pre_ping=True,
+        poolclass=NullPool,
+    )
+    try:
+        yield DatabaseHarness(
+            session_factory=async_sessionmaker(async_engine, expire_on_commit=False),
+            async_engine=async_engine,
+        )
+    finally:
+        await async_engine.dispose()

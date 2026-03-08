@@ -8,7 +8,7 @@ import uuid
 
 from typing import Protocol
 
-from sqlalchemy import delete, exists, select, update
+from sqlalchemy import delete, exists, select
 from sqlalchemy.orm import selectinload
 
 from infra.models import (
@@ -22,6 +22,7 @@ from infra.models import (
 )
 from infra.time import utc_now
 from services.storage import remove_managed_file
+from services.workers import apply_worker_state
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,15 +85,13 @@ async def _update_worker(
     current_transcription_id: uuid.UUID | None,
     last_error: str | None = None,
 ) -> None:
-    await session.execute(
-        update(Worker)
-        .where(Worker.id == worker_id)
-        .values(
-            status=status,
-            last_heartbeat=now,
-            current_transcription_id=current_transcription_id,
-            last_error=last_error,
-        )
+    await apply_worker_state(
+        session,
+        worker_id=worker_id,
+        status=status,
+        now=now,
+        current_transcription_id=current_transcription_id,
+        last_error=last_error,
     )
 
 
@@ -165,15 +164,12 @@ async def claim_next_transcription(
         transcription.error = None
         transcription.completed_at = None
 
-        await session.execute(
-            update(Worker)
-            .where(Worker.id == worker_id)
-            .values(
-                status=WorkerStatus.PROCESSING,
-                last_heartbeat=now,
-                current_transcription_id=transcription.id,
-                last_error=None,
-            )
+        await apply_worker_state(
+            session,
+            worker_id=worker_id,
+            status=WorkerStatus.PROCESSING,
+            now=now,
+            current_transcription_id=transcription.id,
         )
         session.add(lease)
         await session.commit()
@@ -229,8 +225,9 @@ async def complete_transcription(
     session_factory: Callable[[], SessionContextManager],
     transcription_id: uuid.UUID,
     worker_id: uuid.UUID,
-    transcript_text: str,
     segments_json: dict | None,
+    speakers_json: list[dict] | None,
+    turns_json: list[dict] | None,
     upload_dir: str | Path,
     now_factory: Callable[[], datetime] = utc_now,
 ) -> None:
@@ -249,8 +246,9 @@ async def complete_transcription(
         lease.transcription.status = TranscriptionStatus.COMPLETED
         lease.transcription.error = None
         lease.transcription.completed_at = now
-        lease.transcription.artifact.transcript_text = transcript_text
         lease.transcription.artifact.segments_json = segments_json
+        lease.transcription.artifact.speakers_json = speakers_json
+        lease.transcription.artifact.turns_json = turns_json
         upload_path = lease.transcription.artifact.upload_path
         await _update_worker(
             session,
@@ -359,14 +357,13 @@ async def recover_stale_leases(
                 requeued_ids.append(lease.transcription_id)
 
             lease.transcription.completed_at = None
-            await session.execute(
-                update(Worker)
-                .where(Worker.id == lease.worker_id)
-                .values(
-                    status=WorkerStatus.STALE,
-                    current_transcription_id=None,
-                    last_error="Lease expired",
-                )
+            await apply_worker_state(
+                session,
+                worker_id=lease.worker_id,
+                status=WorkerStatus.STALE,
+                now=now,
+                current_transcription_id=None,
+                last_error="Lease expired",
             )
 
         if stale_leases:
