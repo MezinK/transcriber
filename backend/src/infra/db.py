@@ -14,3 +14,8 @@ def get_engine():
 @lru_cache(maxsize=1)
 def get_session_factory():
     return async_sessionmaker(get_engine(), class_=AsyncSession, expire_on_commit=False)
+
+
+def reset_db_caches() -> None:
+    get_session_factory.cache_clear()
+    get_engine.cache_clear()
