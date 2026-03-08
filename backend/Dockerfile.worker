@@ -1,0 +1,26 @@
+FROM python:3.14-slim
+
+COPY --from=ghcr.io/astral-sh/uv:0.6.9 /uv /uvx /bin/
+
+# Transitional Dockerfile: lives under backend/ now, but still builds the
+# existing worker package until the runtime migration tasks are complete.
+RUN useradd --create-home --no-log-init appuser
+
+WORKDIR /app
+
+COPY shared/ /app/shared/
+COPY worker/pyproject.toml worker/uv.lock /app/worker/
+COPY worker/src/worker/__init__.py /app/worker/src/worker/__init__.py
+
+WORKDIR /app/worker
+RUN uv sync --frozen
+
+COPY worker/src/ /app/worker/src/
+
+RUN mkdir -p /uploads && chown -R appuser:appuser /app /uploads
+
+USER appuser
+
+VOLUME /uploads
+
+CMD ["uv", "run", "python", "-m", "worker.main"]

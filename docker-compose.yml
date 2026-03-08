@@ -20,8 +20,8 @@ services:
 
   api:
     build:
-      context: ./backend
-      dockerfile: Dockerfile.api
+      context: .
+      dockerfile: backend/Dockerfile.api
     ports:
       - "8000:8000"
     environment:
@@ -38,8 +38,8 @@ services:
 
   worker:
     build:
-      context: ./backend
-      dockerfile: Dockerfile.worker
+      context: .
+      dockerfile: backend/Dockerfile.worker
     environment:
       DATABASE_URL: "postgresql+asyncpg://app:app@postgres:5432/transcriptions"
       UPLOAD_DIR: /uploads
