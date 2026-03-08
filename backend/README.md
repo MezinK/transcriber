@@ -14,3 +14,5 @@ Unified backend project for the local transcription tool.
 
 - Local uploads default to `backend/var/uploads`.
 - Docker Compose overrides `UPLOAD_DIR` to `/uploads` inside the containers.
+- Worker diarization defaults to `DIARIZATION_ENGINE=pyannote` and `DIARIZATION_DEVICE=cpu`.
+- `PYANNOTE_AUTH_TOKEN` must be set for worker environments that need to download or load pyannote diarization models.

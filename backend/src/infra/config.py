@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     lease_duration_seconds: int = Field(default=120, gt=0)
     worker_poll_interval_seconds: float = Field(default=2.0, gt=0)
     heartbeat_interval_seconds: float = Field(default=30.0, gt=0)
+    diarization_engine: str = "pyannote"
+    diarization_device: str = "cpu"
+    pyannote_auth_token: str | None = None
 
     model_config = {"env_prefix": ""}
 

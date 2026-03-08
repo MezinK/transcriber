@@ -44,6 +44,9 @@ services:
       UPLOAD_DIR: /uploads
       TRANSCRIPTION_ENGINE: faster-whisper
       WHISPER_MODEL: base
+      DIARIZATION_ENGINE: pyannote
+      DIARIZATION_DEVICE: cpu
+      PYANNOTE_AUTH_TOKEN: ${PYANNOTE_AUTH_TOKEN:-}
     command: ["python", "-m", "worker.main"]
     volumes:
       - uploads:/uploads

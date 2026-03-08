@@ -18,6 +18,9 @@ async def test_get_settings_reads_local_defaults():
     assert settings.lease_duration_seconds == 120
     assert settings.worker_poll_interval_seconds == 2.0
     assert settings.heartbeat_interval_seconds == 30.0
+    assert settings.diarization_engine == "pyannote"
+    assert settings.diarization_device == "cpu"
+    assert settings.pyannote_auth_token is None
 
 
 @pytest.mark.asyncio
@@ -40,6 +43,9 @@ async def test_cache_reset_allows_env_override_and_refresh(monkeypatch):
     monkeypatch.setattr(AsyncEngine, "dispose", wrapped_dispose)
     monkeypatch.setenv("UPLOAD_DIR", "/tmp/transcriber-tests")
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://app:app@localhost:5432/overridden")
+    monkeypatch.setenv("DIARIZATION_ENGINE", "custom")
+    monkeypatch.setenv("DIARIZATION_DEVICE", "mps")
+    monkeypatch.setenv("PYANNOTE_AUTH_TOKEN", "secret-token")
 
     await reset_db_caches()
     reset_settings_cache()
@@ -50,6 +56,9 @@ async def test_cache_reset_allows_env_override_and_refresh(monkeypatch):
     assert dispose_called
     assert refreshed_settings is not original_settings
     assert refreshed_settings.upload_dir == "/tmp/transcriber-tests"
+    assert refreshed_settings.diarization_engine == "custom"
+    assert refreshed_settings.diarization_device == "mps"
+    assert refreshed_settings.pyannote_auth_token == "secret-token"
     assert str(refreshed_engine.url) == "postgresql+asyncpg://app:***@localhost:5432/overridden"
 
 

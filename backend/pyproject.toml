@@ -13,6 +13,7 @@ dependencies = [
     "pydantic-settings>=2.0",
     "alembic>=1.14",
     "faster-whisper>=1.1",
+    "pyannote.audio>=4.0",
 ]
 
 [dependency-groups]
