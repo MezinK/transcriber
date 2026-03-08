@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { SidebarItem } from "./SidebarItem";
 import { useUpload } from "../../hooks/useUpload";
 import type { Transcription } from "../../types";
