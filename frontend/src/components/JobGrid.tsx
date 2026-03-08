@@ -16,11 +16,7 @@ export function JobGrid({ onPickFile }: JobGridProps) {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-      {jobs.map((job) => (
-        <JobCard key={job.id} job={job} onDelete={deleteJob} />
-      ))}
-
-      {/* + card */}
+      {/* + card always first */}
       <button
         onClick={onPickFile}
         className="bg-zinc-900/50 rounded-lg border border-dashed border-zinc-800 hover:border-zinc-600 hover:bg-zinc-900 transition-all p-4 flex items-center justify-center min-h-[72px] cursor-pointer group"
@@ -29,6 +25,10 @@ export function JobGrid({ onPickFile }: JobGridProps) {
           +
         </span>
       </button>
+
+      {jobs.map((job) => (
+        <JobCard key={job.id} job={job} onDelete={deleteJob} />
+      ))}
     </div>
   );
 }
