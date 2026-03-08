@@ -20,7 +20,7 @@ from services.jobs import (
     renew_lease,
 )
 from services.transcript_assembly import build_transcript_artifacts_from_segments
-from services.workers import heartbeat_worker, register_worker
+from services.workers import cleanup_stale_workers, heartbeat_worker, register_worker
 from worker.diarization import DiarizationEngine, load_diarization_engine
 from worker.engine import TranscriptionEngine, load_engine
 
@@ -85,6 +85,10 @@ class WorkerRuntime:
                 max_attempts=self.max_attempts,
                 upload_dir=self.upload_dir,
                 now_factory=self.now_factory,
+            )
+            await cleanup_stale_workers(
+                session_factory=self.session_factory,
+                now=self.now_factory,
             )
             if processed:
                 continue
@@ -205,13 +209,16 @@ class WorkerRuntime:
 
 async def main() -> None:
     settings = get_settings()
+    diarization_engine_name = (
+        "pyannote" if settings.whisper_diarization_enabled else "none"
+    )
     runtime = WorkerRuntime(
         session_factory=get_session_factory(),
         engine=load_engine(),
         diarization_engine=load_diarization_engine(
-            settings.diarization_engine,
-            auth_token=settings.pyannote_auth_token,
-            device=settings.diarization_device,
+            diarization_engine_name,
+            auth_token=settings.hf_token,
+            device=settings.whisper_device,
         ),
         lease_duration_seconds=settings.lease_duration_seconds,
         heartbeat_interval_seconds=settings.heartbeat_interval_seconds,

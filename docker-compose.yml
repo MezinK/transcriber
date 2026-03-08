@@ -22,6 +22,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+      target: backend-api
     expose:
       - "8000"
     environment:
@@ -36,17 +37,21 @@ services:
         condition: service_completed_successfully
 
   worker:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: backend/Dockerfile
+      target: backend-worker
     environment:
       DATABASE_URL: "postgresql+asyncpg://app:app@postgres:5432/transcriptions"
       UPLOAD_DIR: /uploads
-      TRANSCRIPTION_ENGINE: faster-whisper
+      TRANSCRIPTION_BACKEND: whisperx
       WHISPER_MODEL: base
-      DIARIZATION_ENGINE: pyannote
-      DIARIZATION_DEVICE: cpu
-      PYANNOTE_AUTH_TOKEN: ${PYANNOTE_AUTH_TOKEN:-}
+      WHISPER_DEVICE: cpu
+      WHISPER_COMPUTE_TYPE: int8
+      WHISPER_BATCH_SIZE: "4"
+      WHISPER_DIARIZATION_ENABLED: "true"
+      HF_TOKEN: ${HF_TOKEN:?Set HF_TOKEN to a Hugging Face token with access to pyannote/speaker-diarization-community-1}
     command: ["python", "-m", "worker.main"]
     volumes:
       - uploads:/uploads
@@ -62,6 +67,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+      target: backend-api
     environment:
       DATABASE_URL: "postgresql+asyncpg://app:app@postgres:5432/transcriptions"
       UPLOAD_DIR: /uploads
