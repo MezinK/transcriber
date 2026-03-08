@@ -6,8 +6,10 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import uuid
 
+from typing import Protocol
+
 from sqlalchemy import delete, exists, select, update
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import selectinload
 
 from infra.models import (
     JobLease,
@@ -59,13 +61,15 @@ class TranscriptionDeletionConflictError(JobLifecycleError):
     pass
 
 
-class SessionProtocol:
+class SessionProtocol(Protocol):
+    def add(self, instance: object) -> None: ...
+
     async def execute(self, statement): ...
 
     async def commit(self) -> None: ...
 
 
-class SessionContextManager:
+class SessionContextManager(Protocol):
     async def __aenter__(self) -> SessionProtocol: ...
 
     async def __aexit__(self, exc_type, exc, tb) -> None: ...
@@ -105,7 +109,7 @@ async def _get_owned_lease(
     result = await session.execute(
         select(JobLease)
         .options(
-            joinedload(JobLease.transcription).joinedload(Transcription.artifact)
+            selectinload(JobLease.transcription).selectinload(Transcription.artifact)
         )
         .where(JobLease.transcription_id == transcription_id)
         .with_for_update()
@@ -128,7 +132,7 @@ async def claim_next_transcription(
     async with session_factory() as session:
         result = await session.execute(
             select(Transcription)
-            .options(joinedload(Transcription.artifact))
+            .options(selectinload(Transcription.artifact))
             .where(Transcription.status == TranscriptionStatus.PENDING)
             .where(
                 ~exists(
@@ -175,8 +179,7 @@ async def claim_next_transcription(
                 last_error=None,
             )
         )
-        # AsyncSession.add() is synchronous. The protocol stays minimal elsewhere.
-        session.add(lease)  # type: ignore[attr-defined]
+        session.add(lease)
         await session.commit()
         return ClaimedTranscription(
             transcription_id=transcription.id,
@@ -328,7 +331,7 @@ async def recover_stale_leases(
         result = await session.execute(
             select(JobLease)
             .options(
-                joinedload(JobLease.transcription).joinedload(Transcription.artifact)
+                selectinload(JobLease.transcription).selectinload(Transcription.artifact)
             )
             .where(JobLease.leased_until < now)
             .order_by(JobLease.leased_until, JobLease.transcription_id)

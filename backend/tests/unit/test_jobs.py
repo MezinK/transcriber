@@ -301,3 +301,15 @@ async def test_complete_transcription_does_not_cleanup_when_commit_fails(
     assert transcription.status == TranscriptionStatus.COMPLETED
     assert artifact.transcript_text == "hello world"
     assert removed_paths == []
+
+
+@pytest.mark.asyncio
+async def test_ensure_transcription_deletable_raises_when_lease_exists():
+    transcription_id = uuid.uuid4()
+    session = FakeSession(scalars=[transcription_id])
+
+    with pytest.raises(jobs.TranscriptionDeletionConflictError):
+        await jobs.ensure_transcription_deletable(
+            session_factory=FakeSessionFactory(session),
+            transcription_id=transcription_id,
+        )

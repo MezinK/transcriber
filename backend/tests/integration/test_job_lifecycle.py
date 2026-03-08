@@ -14,8 +14,10 @@ from alembic.config import Config
 import psycopg
 from psycopg import sql
 import pytest
+import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from infra.models import (
     JobLease,
@@ -39,7 +41,7 @@ POSTGRES_IMAGE = "postgres:17"
 
 
 @dataclass
-class TestDatabase:
+class DatabaseHarness:
     session_factory: async_sessionmaker
     async_engine: object
 
@@ -127,8 +129,8 @@ def _drop_database(admin_url: str, database_name: str) -> None:
             )
 
 
-@pytest.fixture
-def database() -> Iterator[TestDatabase]:
+@pytest_asyncio.fixture
+async def database() -> Iterator[DatabaseHarness]:
     container_name: str | None = None
     database_name: str | None = None
     admin_url: str | None = None
@@ -152,14 +154,18 @@ def database() -> Iterator[TestDatabase]:
         config.set_main_option("sqlalchemy.url", sync_database_url)
         command.upgrade(config, "head")
 
-        async_engine = create_async_engine(async_database_url, pool_pre_ping=True)
-        yield TestDatabase(
+        async_engine = create_async_engine(
+            async_database_url,
+            pool_pre_ping=True,
+            poolclass=NullPool,
+        )
+        yield DatabaseHarness(
             session_factory=async_sessionmaker(async_engine, expire_on_commit=False),
             async_engine=async_engine,
         )
     finally:
         if async_engine is not None:
-            asyncio.run(async_engine.dispose())
+            await async_engine.dispose()
         try:
             if admin_url is not None and database_name is not None:
                 _drop_database(admin_url, database_name)
@@ -276,7 +282,7 @@ class _ProxySessionContext:
 
 @pytest.mark.asyncio
 async def test_recover_stale_leases_requeues_or_fails_based_on_attempts(
-    database: TestDatabase,
+    database: DatabaseHarness,
     tmp_path: Path,
 ):
     now = datetime(2026, 3, 8, 12, 0, tzinfo=UTC)
@@ -348,7 +354,7 @@ async def test_recover_stale_leases_requeues_or_fails_based_on_attempts(
 
 @pytest.mark.asyncio
 async def test_claim_next_transcription_does_not_duplicate_claims(
-    database: TestDatabase,
+    database: DatabaseHarness,
     tmp_path: Path,
 ):
     worker_one = uuid.uuid4()
@@ -416,7 +422,7 @@ async def test_claim_next_transcription_does_not_duplicate_claims(
 
 @pytest.mark.asyncio
 async def test_complete_transcription_removes_upload_only_after_commit(
-    database: TestDatabase,
+    database: DatabaseHarness,
     tmp_path: Path,
 ):
     worker_id = uuid.uuid4()
