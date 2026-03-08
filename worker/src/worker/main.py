@@ -53,7 +53,7 @@ async def reaper_loop(stop_event: asyncio.Event):
 
 
 async def main():
-    worker_id = uuid.uuid4()
+    worker_id = uuid.uuid7()
     logger.info("Starting worker %s", worker_id)
 
     try:

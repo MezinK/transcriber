@@ -64,7 +64,7 @@ async def create_transcription(file: UploadFile):
             detail=f"File too large. Maximum size: {s.max_upload_bytes // (1024 * 1024)} MB",
         )
 
-    file_id = uuid.uuid4()
+    file_id = uuid.uuid7()
     ext = Path(safe_name).suffix
     stored_name = f"{file_id}{ext}"
     upload_dir = Path(s.upload_dir)

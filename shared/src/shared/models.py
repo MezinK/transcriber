@@ -33,7 +33,7 @@ class Transcription(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid7
     )
     status: Mapped[TranscriptionStatus] = mapped_column(
         Enum(TranscriptionStatus, name="transcription_status"),
