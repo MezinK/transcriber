@@ -46,12 +46,12 @@ services:
       DATABASE_URL: "postgresql+asyncpg://app:app@postgres:5432/transcriptions"
       UPLOAD_DIR: /uploads
       TRANSCRIPTION_BACKEND: whisperx
-      WHISPER_MODEL: base
-      WHISPER_DEVICE: cpu
-      WHISPER_COMPUTE_TYPE: int8
-      WHISPER_BATCH_SIZE: "4"
-      WHISPER_DIARIZATION_ENABLED: "true"
-      HF_TOKEN: ${HF_TOKEN:?Set HF_TOKEN when WhisperX diarization is enabled}
+      WHISPER_MODEL: ${WHISPER_MODEL:-base}
+      WHISPER_DEVICE: ${WHISPER_DEVICE:-cpu}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8}
+      WHISPER_BATCH_SIZE: ${WHISPER_BATCH_SIZE:-4}
+      WHISPER_DIARIZATION_ENABLED: ${WHISPER_DIARIZATION_ENABLED:-true}
+      HF_TOKEN: ${HF_TOKEN:-}
     command: ["python", "-m", "worker.main"]
     volumes:
       - uploads:/uploads

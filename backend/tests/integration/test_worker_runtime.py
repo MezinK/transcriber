@@ -1,24 +1,15 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
-from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 import asyncio
-import subprocess
 import threading
 import time
 import uuid
 
-from alembic import command
-from alembic.config import Config
-import psycopg
-from psycopg import sql
 import pytest
-import pytest_asyncio
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from sqlalchemy.pool import NullPool
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from infra.models import (
     JobLease,
@@ -34,140 +25,6 @@ from worker import main as worker_main
 from worker.main import WorkerRuntime
 from worker.pipeline import PipelineStageError
 from worker.pipeline_types import Segment, TranscriptArtifacts, Word
-
-BACKEND_ROOT = Path(__file__).resolve().parents[2]
-ALEMBIC_INI = BACKEND_ROOT / "alembic.ini"
-POSTGRES_IMAGE = "postgres:17"
-
-
-@dataclass
-class DatabaseHarness:
-    session_factory: async_sessionmaker
-
-
-def _run_command(*args: str) -> str:
-    result = subprocess.run(
-        args,
-        cwd=BACKEND_ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return result.stdout.strip()
-
-
-def _start_postgres_container() -> tuple[str, int]:
-    container_name = f"transcriber-runtime-{uuid.uuid4().hex[:12]}"
-    _run_command(
-        "docker",
-        "run",
-        "-d",
-        "--rm",
-        "-P",
-        "--name",
-        container_name,
-        "-e",
-        "POSTGRES_DB=postgres",
-        "-e",
-        "POSTGRES_USER=app",
-        "-e",
-        "POSTGRES_PASSWORD=app",
-        POSTGRES_IMAGE,
-    )
-    port_mapping = _run_command("docker", "port", container_name, "5432/tcp")
-    return container_name, int(port_mapping.rsplit(":", 1)[1])
-
-
-def _stop_postgres_container(container_name: str) -> None:
-    subprocess.run(
-        ["docker", "rm", "-f", container_name],
-        cwd=BACKEND_ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-
-
-def _wait_for_postgres(admin_url: str, timeout_seconds: float = 30.0) -> None:
-    deadline = time.monotonic() + timeout_seconds
-    last_error: Exception | None = None
-    while time.monotonic() < deadline:
-        try:
-            with psycopg.connect(admin_url):
-                return
-        except psycopg.Error as exc:
-            last_error = exc
-            time.sleep(1)
-    raise RuntimeError("PostgreSQL did not become ready in time") from last_error
-
-
-def _create_database(admin_url: str, database_name: str) -> None:
-    with psycopg.connect(admin_url, autocommit=True) as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                sql.SQL("CREATE DATABASE {}").format(sql.Identifier(database_name))
-            )
-
-
-def _drop_database(admin_url: str, database_name: str) -> None:
-    with psycopg.connect(admin_url, autocommit=True) as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT pg_terminate_backend(pid)
-                FROM pg_stat_activity
-                WHERE datname = %s AND pid <> pg_backend_pid()
-                """,
-                (database_name,),
-            )
-            cursor.execute(
-                sql.SQL("DROP DATABASE IF EXISTS {}").format(
-                    sql.Identifier(database_name)
-                )
-            )
-
-
-@pytest_asyncio.fixture
-async def database() -> Iterator[DatabaseHarness]:
-    container_name: str | None = None
-    database_name: str | None = None
-    admin_url: str | None = None
-    async_engine = None
-
-    try:
-        container_name, host_port = _start_postgres_container()
-        admin_url = f"postgresql://app:app@127.0.0.1:{host_port}/postgres"
-        _wait_for_postgres(admin_url)
-        database_name = f"runtime_test_{uuid.uuid4().hex}"
-        _create_database(admin_url, database_name)
-
-        sync_database_url = (
-            f"postgresql+psycopg://app:app@127.0.0.1:{host_port}/{database_name}"
-        )
-        async_database_url = (
-            f"postgresql+asyncpg://app:app@127.0.0.1:{host_port}/{database_name}"
-        )
-        config = Config(str(ALEMBIC_INI))
-        config.set_main_option("sqlalchemy.url", sync_database_url)
-        command.upgrade(config, "head")
-
-        async_engine = create_async_engine(
-            async_database_url,
-            pool_pre_ping=True,
-            poolclass=NullPool,
-        )
-        yield DatabaseHarness(
-            session_factory=async_sessionmaker(async_engine, expire_on_commit=False)
-        )
-    finally:
-        if async_engine is not None:
-            await async_engine.dispose()
-        try:
-            if admin_url is not None and database_name is not None:
-                _drop_database(admin_url, database_name)
-        finally:
-            if container_name is not None:
-                _stop_postgres_container(container_name)
 
 
 async def _seed_transcription(session_factory, tmp_path: Path) -> tuple[uuid.UUID, Path]:
@@ -328,7 +185,7 @@ class BlockingPipeline:
 
 
 @pytest.mark.asyncio
-async def test_worker_claims_a_pending_job(database: DatabaseHarness, tmp_path: Path):
+async def test_worker_claims_a_pending_job(database, tmp_path: Path):
     transcription_id, _ = await _seed_transcription(database.session_factory, tmp_path)
     pipeline = BlockingPipeline()
     runtime = WorkerRuntime(
@@ -361,7 +218,7 @@ async def test_worker_claims_a_pending_job(database: DatabaseHarness, tmp_path: 
 
 @pytest.mark.asyncio
 async def test_heartbeat_renews_lease_during_work(
-    database: DatabaseHarness,
+    database,
     tmp_path: Path,
 ):
     transcription_id, _ = await _seed_transcription(database.session_factory, tmp_path)
@@ -396,7 +253,7 @@ async def test_heartbeat_renews_lease_during_work(
 
 @pytest.mark.asyncio
 async def test_completion_writes_results_and_clears_lease(
-    database: DatabaseHarness,
+    database,
     tmp_path: Path,
 ):
     transcription_id, upload_path = await _seed_transcription(
@@ -440,7 +297,7 @@ async def test_completion_writes_results_and_clears_lease(
 
 @pytest.mark.asyncio
 async def test_failure_requeues_with_incremented_attempt_count(
-    database: DatabaseHarness,
+    database,
     tmp_path: Path,
 ):
     transcription_id, upload_path = await _seed_transcription(
@@ -473,7 +330,7 @@ async def test_failure_requeues_with_incremented_attempt_count(
 
 @pytest.mark.asyncio
 async def test_shutdown_preserves_recoverable_state(
-    database: DatabaseHarness,
+    database,
     tmp_path: Path,
 ):
     now = datetime(2026, 3, 8, 16, 30, tzinfo=UTC)
@@ -528,7 +385,7 @@ async def test_shutdown_preserves_recoverable_state(
 
 @pytest.mark.asyncio
 async def test_run_recovers_stale_leases_during_busy_iterations(
-    database: DatabaseHarness,
+    database,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -582,7 +439,7 @@ async def test_run_recovers_stale_leases_during_busy_iterations(
 
 @pytest.mark.asyncio
 async def test_run_prunes_stale_inactive_workers(
-    database: DatabaseHarness,
+    database,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):

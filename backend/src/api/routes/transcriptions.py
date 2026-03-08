@@ -2,8 +2,6 @@ from pathlib import Path
 import uuid
 
 from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile, status
-from sqlalchemy import func, select
-from sqlalchemy.orm import joinedload
 
 from api.schemas import (
     RenameSpeakerRequest,
@@ -12,12 +10,16 @@ from api.schemas import (
 )
 from infra.config import get_settings
 from infra.db import get_session_factory
-from infra.models import Transcription, TranscriptionArtifact
 from services.speakers import (
     SpeakerNotFoundError,
     SpeakerRenameConflictError,
     TranscriptionNotFoundError,
     rename_transcription_speaker,
+)
+from services.transcriptions import (
+    get_transcription as fetch_transcription,
+    list_transcriptions as fetch_transcriptions,
+    serialize_transcription,
 )
 from services.storage import UploadTooLargeError, UploadValidationError
 from services.uploads import DeleteUploadResult, create_upload, delete_upload
@@ -66,33 +68,25 @@ async def list_transcriptions(
     limit: int = Query(20, ge=1, le=100),
 ) -> TranscriptionListResponse:
     session_factory = get_session_factory()
-    async with session_factory() as session:
-        count = (await session.execute(select(func.count(Transcription.id)))).scalar_one()
-        result = await session.execute(
-            select(Transcription)
-            .options(joinedload(Transcription.artifact))
-            .order_by(Transcription.created_at.desc())
-            .offset(offset)
-            .limit(limit)
-        )
-        items = result.unique().scalars().all()
+    items, total = await fetch_transcriptions(
+        session_factory=session_factory,
+        offset=offset,
+        limit=limit,
+    )
 
     return TranscriptionListResponse(
-        items=[_serialize_transcription(item) for item in items],
-        total=count,
+        items=[TranscriptionResponse(**serialize_transcription(item)) for item in items],
+        total=total,
     )
 
 
 @router.get("/{transcription_id}", response_model=TranscriptionResponse)
 async def get_transcription(transcription_id: uuid.UUID) -> TranscriptionResponse:
     session_factory = get_session_factory()
-    async with session_factory() as session:
-        result = await session.execute(
-            select(Transcription)
-            .options(joinedload(Transcription.artifact))
-            .where(Transcription.id == transcription_id)
-        )
-        transcription = result.unique().scalar_one_or_none()
+    transcription = await fetch_transcription(
+        session_factory=session_factory,
+        transcription_id=transcription_id,
+    )
 
     if transcription is None:
         raise HTTPException(
@@ -100,7 +94,7 @@ async def get_transcription(transcription_id: uuid.UUID) -> TranscriptionRespons
             detail="Transcription not found",
         )
 
-    return _serialize_transcription(transcription)
+    return TranscriptionResponse(**serialize_transcription(transcription))
 
 
 @router.delete("/{transcription_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -155,22 +149,4 @@ async def rename_transcription_speaker_route(
             detail="Transcription is currently being processed",
         ) from exc
 
-    return _serialize_transcription(transcription)
-
-
-def _serialize_transcription(transcription: Transcription) -> TranscriptionResponse:
-    artifact: TranscriptionArtifact | None = transcription.artifact
-    return TranscriptionResponse(
-        id=transcription.id,
-        source_filename=transcription.source_filename,
-        media_type=transcription.media_type,
-        status=transcription.status,
-        attempt_count=transcription.attempt_count,
-        error=transcription.error,
-        created_at=transcription.created_at,
-        updated_at=transcription.updated_at,
-        completed_at=transcription.completed_at,
-        segments_json=None if artifact is None else artifact.segments_json,
-        speakers=None if artifact is None else artifact.speakers_json,
-        turns=None if artifact is None else artifact.turns_json,
-    )
+    return TranscriptionResponse(**serialize_transcription(transcription))

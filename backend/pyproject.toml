@@ -17,8 +17,6 @@ dependencies = [
 [project.optional-dependencies]
 worker = [
     "whisperx",
-    "faster-whisper>=1.1",
-    "pyannote.audio>=4.0",
 ]
 
 [dependency-groups]

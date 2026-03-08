@@ -4,7 +4,8 @@ Unified backend project for the local transcription tool.
 
 ## Commands
 
-- Install dependencies: `uv sync`
+- Install API and migration dependencies: `uv sync`
+- Install worker dependencies, including WhisperX: `uv sync --extra worker`
 - Run migrations: `uv run alembic upgrade head`
 - Start API: `uv run uvicorn api.main:app --host 0.0.0.0 --port 8000`
 - Start worker: `uv run python -m worker.main`
@@ -14,10 +15,10 @@ Unified backend project for the local transcription tool.
 
 - Local uploads default to `backend/var/uploads`.
 - Docker Compose overrides `UPLOAD_DIR` to `/uploads` inside the containers.
-- Worker diarization defaults to `DIARIZATION_ENGINE=pyannote` and `DIARIZATION_DEVICE=cpu`.
-- `HF_TOKEN` is shared by diarization and `faster-whisper` model downloads.
-- `HF_TOKEN` must be set when the worker needs to download or load pyannote diarization models, and that token must have accepted the `pyannote/speaker-diarization-community-1` model terms on Hugging Face.
-- Docker Compose runs the backend services as `linux/amd64` so the pyannote dependency chain has compatible wheels on ARM hosts.
+- Worker defaults to `TRANSCRIPTION_BACKEND=whisperx`, `WHISPER_MODEL=base`, `WHISPER_DEVICE=cpu`, `WHISPER_COMPUTE_TYPE=int8`, and `WHISPER_BATCH_SIZE=4`.
+- Diarization defaults to `WHISPER_DIARIZATION_ENABLED=true`.
+- `HF_TOKEN` is required only when WhisperX diarization is enabled, and that token must have accepted the Hugging Face model terms WhisperX depends on for diarization.
+- Docker Compose runs the worker as `linux/amd64` so the current WhisperX stack stays on the most stable wheel path across hosts.
 
 ## WhisperX Planning Guardrail
 
