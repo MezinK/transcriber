@@ -22,6 +22,7 @@ Unified backend project for the local transcription tool.
 ## WhisperX Planning Guardrail
 
 - Verify WhisperX integration details against Context7 before changing backend runtime code.
+- Do not rely on memory for the WhisperX Python API. Re-check Context7 before changing model loading, alignment, diarization, or speaker-assignment flow.
 - Treat `docs/plans/2026-03-08-whisperx-context7-notes.md` as the checked-in summary of the current WhisperX Python flow and runtime caveats.
 
 ## Transcript Artifacts

@@ -1,31 +1,43 @@
 # WhisperX Context7 Notes
 
-- Source library: `/m-bain/whisperx`
-- Verification source: Context7 summary of the WhisperX Python API and README examples
+- Library: `/m-bain/whisperx`
+- Integration source: Context7 queries against the upstream WhisperX documentation and README
 
-## Planned Python Flow
+## Pipeline Order
 
-1. `audio = whisperx.load_audio(file_path)`
-2. `model = whisperx.load_model(model_name, device, compute_type=compute_type)`
-3. `result = model.transcribe(audio, batch_size=batch_size)`
-4. `align_model, metadata = whisperx.load_align_model(language_code=result["language"], device=device)`
-5. `aligned = whisperx.align(result["segments"], align_model, metadata, audio, device, return_char_alignments=False)`
-6. `diarizer = whisperx.diarize.DiarizationPipeline(token=hf_token, device=device)`
-7. `speaker_segments = diarizer(audio, min_speakers=min_speakers, max_speakers=max_speakers)`
-8. `final = whisperx.assign_word_speakers(speaker_segments, aligned)`
+- `whisperx.load_audio(file_path)`
+- `whisperx.load_model(model_name, device, compute_type=...)`
+- `model.transcribe(audio, batch_size=...)`
+- `whisperx.load_align_model(language_code=result["language"], device=device)`
+- `whisperx.align(result["segments"], align_model, metadata, audio, device, return_char_alignments=False)`
+- `whisperx.diarize.DiarizationPipeline(token=hf_token, device=device)`
+- `diarizer(audio, min_speakers=..., max_speakers=...)`
+- `whisperx.assign_word_speakers(diarize_segments, aligned_result)`
 
 ## Required Output Fields
 
 - `result["language"]`
 - `result["segments"]`
+- `segment["start"]`
+- `segment["end"]`
+- `segment["text"]`
 - `segment["words"]`
 - `segment.get("speaker")`
+- `word["word"]`
+- `word.get("start")`
+- `word.get("end")`
+- `word.get("speaker")`
 
 ## Runtime Notes
 
-- Use Context7 as the source of truth for WhisperX integration details before changing runtime code.
-- `device` and `compute_type` must be configurable because WhisperX supports different CPU/GPU modes.
-- `batch_size` must be configurable because the docs explicitly tie it to available memory.
-- A Hugging Face token is required when diarization is enabled through `DiarizationPipeline`.
-- The worker should free model memory between transcription, alignment, and diarization stages.
-- WhisperX audio loading goes through `whisperx.load_audio(...)`, so the worker should treat file-path input as the canonical entrypoint.
+- Diarization requires a Hugging Face token when diarization is enabled.
+- Device and compute type must be configurable.
+- Batch size must be configurable because memory needs differ by CPU/GPU setup.
+- The worker should release stage models between transcription, alignment, and diarization to reduce memory pressure.
+- WhisperX audio loading expects FFmpeg-compatible media input and normalizes audio for the pipeline.
+
+## Implementation Guidance
+
+- Do not implement the backend integration from memory.
+- Re-check Context7 before changing the WhisperX pipeline contract, model-loading flow, or diarization behavior.
+- Convert WhisperX output into backend-owned typed DTOs before persisting JSON artifacts.
