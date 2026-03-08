@@ -2,6 +2,8 @@ import re
 from pathlib import Path
 from typing import Protocol
 
+import aiofiles
+
 from infra.models import MediaType
 
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".flac", ".ogg", ".m4a", ".wma", ".aac"}
@@ -40,14 +42,14 @@ async def save_upload_stream(
     total_size = 0
     destination.parent.mkdir(parents=True, exist_ok=True)
 
-    with destination.open("wb") as handle:
+    async with aiofiles.open(destination, "wb") as handle:
         while chunk := await file.read(chunk_size):
             total_size += len(chunk)
             if total_size > max_upload_bytes:
                 raise ValueError(
                     f"File too large. Maximum size: {max_upload_bytes // (1024 * 1024)} MB"
                 )
-            handle.write(chunk)
+            await handle.write(chunk)
 
     return total_size
 

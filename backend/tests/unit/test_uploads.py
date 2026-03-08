@@ -1,4 +1,3 @@
-from collections.abc import AsyncIterator
 from pathlib import Path
 
 import pytest
@@ -22,18 +21,24 @@ class FakeUploadFile:
 
 
 class FakeSession:
-    def __init__(self, *, fail_commit: bool = False):
+    def __init__(self, *, fail_commit: bool = False, fail_refresh: bool = False):
         self.fail_commit = fail_commit
+        self.fail_refresh = fail_refresh
         self.added: list[object] = []
 
     def add(self, instance: object) -> None:
         self.added.append(instance)
+
+    async def flush(self) -> None:
+        return None
 
     async def commit(self) -> None:
         if self.fail_commit:
             raise RuntimeError("commit failed")
 
     async def refresh(self, instance: object) -> None:
+        if self.fail_refresh:
+            raise RuntimeError("refresh failed")
         return None
 
 
@@ -107,6 +112,23 @@ async def test_create_upload_cleans_file_when_commit_fails(tmp_path: Path):
     session_factory = FakeSessionFactory(session)
 
     with pytest.raises(RuntimeError, match="commit failed"):
+        await create_upload(
+            file=FakeUploadFile([b"payload"]),
+            original_filename="episode.webm",
+            session_factory=session_factory,
+            upload_dir=tmp_path,
+            max_upload_bytes=1024,
+        )
+
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.asyncio
+async def test_create_upload_cleans_file_when_refresh_fails(tmp_path: Path):
+    session = FakeSession(fail_refresh=True)
+    session_factory = FakeSessionFactory(session)
+
+    with pytest.raises(RuntimeError, match="refresh failed"):
         await create_upload(
             file=FakeUploadFile([b"payload"]),
             original_filename="episode.webm",
