@@ -46,6 +46,13 @@ Boundary rules:
 
 The frontend remains in `frontend/` and does not share runtime code with the backend.
 
+Implementation status after refactor:
+
+- runtime commands now execute from `backend/`
+- schema creation moved to Alembic migrations
+- API and worker both run on the service layer instead of the legacy package split
+- the legacy top-level `api/`, `worker/`, and `shared/` packages are removed once import smoke and full backend verification pass
+
 ## Architecture
 
 The backend remains a two-process system:
@@ -195,4 +202,3 @@ Chosen direction:
 - retain separate API and worker processes
 - keep Postgres if desired, but model jobs around leases instead of worker-owned state
 - keep a `workers` table for UI visibility only
-
