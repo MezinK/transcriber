@@ -19,7 +19,7 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
     """Attach a unique request ID to every request for tracing."""
 
     async def dispatch(self, request: Request, call_next):
-        request_id = request.headers.get("X-Request-ID", str(uuid_mod.uuid4()))
+        request_id = request.headers.get("X-Request-ID", str(uuid_mod.uuid7()))
         request.state.request_id = request_id
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
@@ -27,7 +27,7 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_: FastAPI):
     # Retry DB schema creation in case Postgres is briefly unavailable
     for attempt in range(5):
         try:
@@ -58,5 +58,5 @@ async def health():
             await session.execute(text("SELECT 1"))
         return {"status": "ok"}
     except Exception:
-        logger.exception("Health check failed — database unreachable")
+        logger.exception("Health check failed - database unreachable")
         return {"status": "unhealthy", "detail": "database unreachable"}

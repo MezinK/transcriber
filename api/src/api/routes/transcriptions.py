@@ -91,9 +91,6 @@ async def create_transcription(file: UploadFile):
         file_path.unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail="Failed to save uploaded file")
 
-    # Store relative path (just the filename) — avoids breaking if upload dir moves (P4)
-    relative_path = stored_name
-
     # Create DB record — if this fails, clean up the orphaned file
     transcription = Transcription(
         file_path=str(file_path),
@@ -120,7 +117,6 @@ async def list_transcriptions(
     offset: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
 ):
-    # Atomic count + fetch in a single transaction (I8)
     async with async_session() as session:
         async with session.begin():
             query = select(Transcription).order_by(Transcription.created_at.desc())
