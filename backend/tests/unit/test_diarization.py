@@ -3,52 +3,156 @@ import sys
 
 import pytest
 
-from worker.diarization import PyannoteDiarizationEngine, SpeakerSpan, load_diarization_engine
+from worker.whisperx_pipeline import WhisperXPipeline
 
 
-def test_pyannote_diarization_engine_normalizes_pipeline_output(monkeypatch):
-    class FakePipeline:
-        def __init__(self):
-            self.device = None
+def test_whisperx_pipeline_runs_full_flow(monkeypatch):
+    calls: list[str] = []
 
-        @classmethod
-        def from_pretrained(cls, model_name, use_auth_token=None):
-            assert model_name == "pyannote/speaker-diarization-3.1"
-            assert use_auth_token == "token"
-            return cls()
+    class FakeModel:
+        def transcribe(self, audio, batch_size):
+            calls.append(f"transcribe:{audio}:{batch_size}")
+            return {
+                "language": "en",
+                "segments": [
+                    {
+                        "start": 0.0,
+                        "end": 1.0,
+                        "text": "Hello world",
+                        "words": [
+                            {"word": "Hello", "start": 0.0, "end": 0.5, "score": 0.9},
+                            {"word": "world", "start": 0.5, "end": 1.0, "score": 0.8},
+                        ],
+                    }
+                ],
+            }
 
-        def to(self, device):
-            self.device = device
-            return self
+    class FakeDiarizationPipeline:
+        def __init__(self, *, token, device):
+            calls.append(f"diarizer:{token}:{device}")
 
-        def __call__(self, file_path):
-            assert file_path == "/tmp/example.wav"
+        def __call__(self, audio, **kwargs):
+            calls.append(f"diarize:{audio}:{kwargs}")
+            return [{"speaker": "speaker_0"}]
 
-            class FakeDiarization:
-                def itertracks(self, yield_label=False):
-                    items = [
-                        (SimpleNamespace(start=0.0, end=1.2), None, "SPEAKER_00"),
-                        (SimpleNamespace(start=1.2, end=2.0), None, "SPEAKER_01"),
-                    ]
-                    for item in items:
-                        yield item
+    def fake_load_audio(file_path):
+        calls.append(f"load_audio:{file_path}")
+        return "audio-array"
 
-            return FakeDiarization()
+    def fake_load_model(model_name, device, compute_type=None):
+        calls.append(f"load_model:{model_name}:{device}:{compute_type}")
+        return FakeModel()
+
+    def fake_load_align_model(*, language_code, device):
+        calls.append(f"load_align_model:{language_code}:{device}")
+        return "align-model", {"language_code": language_code}
+
+    def fake_align(segments, model, metadata, audio, device, return_char_alignments=False):
+        calls.append(f"align:{audio}:{device}:{return_char_alignments}")
+        return {
+            "segments": [
+                {
+                    "start": 0.0,
+                    "end": 1.0,
+                    "text": "Hello world",
+                    "speaker": "speaker_0",
+                    "words": [
+                        {
+                            "word": "Hello",
+                            "start": 0.0,
+                            "end": 0.5,
+                            "score": 0.9,
+                            "speaker": "speaker_0",
+                        },
+                        {
+                            "word": "world",
+                            "start": 0.5,
+                            "end": 1.0,
+                            "score": 0.8,
+                            "speaker": "speaker_0",
+                        },
+                    ],
+                }
+            ]
+        }
+
+    def fake_assign_word_speakers(speaker_segments, aligned):
+        calls.append(f"assign_word_speakers:{speaker_segments}")
+        return aligned
 
     monkeypatch.setitem(
         sys.modules,
-        "pyannote.audio",
-        SimpleNamespace(Pipeline=FakePipeline),
+        "whisperx",
+        SimpleNamespace(
+            load_audio=fake_load_audio,
+            load_model=fake_load_model,
+            load_align_model=fake_load_align_model,
+            align=fake_align,
+            assign_word_speakers=fake_assign_word_speakers,
+        ),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "whisperx.diarize",
+        SimpleNamespace(DiarizationPipeline=FakeDiarizationPipeline),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "torch",
+        SimpleNamespace(cuda=SimpleNamespace(empty_cache=lambda: calls.append("empty_cache"))),
     )
 
-    engine = PyannoteDiarizationEngine(auth_token="token", device="cpu")
+    pipeline = WhisperXPipeline(
+        model_name="base",
+        device="cpu",
+        compute_type="int8",
+        batch_size=4,
+        diarization_enabled=True,
+        hf_token="token",
+        min_speakers=1,
+        max_speakers=2,
+    )
 
-    assert engine.diarize("/tmp/example.wav") == [
-        SpeakerSpan(speaker_key="speaker_00", start=0.0, end=1.2),
-        SpeakerSpan(speaker_key="speaker_01", start=1.2, end=2.0),
+    result = pipeline.run("/tmp/example.wav")
+
+    assert result.language == "en"
+    assert result.speakers == [
+        {"speaker_key": "speaker_0", "display_name": "Speaker 1"}
+    ]
+    assert result.turns == [
+        {
+            "speaker_key": "speaker_0",
+            "start": 0.0,
+            "end": 1.0,
+            "text": "Hello world",
+        }
+    ]
+    assert calls == [
+        "load_audio:/tmp/example.wav",
+        "load_model:base:cpu:int8",
+        "transcribe:audio-array:4",
+        "empty_cache",
+        "load_align_model:en:cpu",
+        "align:audio-array:cpu:False",
+        "empty_cache",
+        "diarizer:token:cpu",
+        "diarize:audio-array:{'min_speakers': 1, 'max_speakers': 2}",
+        "assign_word_speakers:[{'speaker': 'speaker_0'}]",
+        "empty_cache",
     ]
 
 
-def test_load_diarization_engine_rejects_unknown_engine():
-    with pytest.raises(ValueError, match="Unsupported diarization engine"):
-        load_diarization_engine("unknown", auth_token=None, device="cpu")
+def test_whisperx_pipeline_requires_token_when_diarization_enabled():
+    pipeline = WhisperXPipeline(
+        model_name="base",
+        device="cpu",
+        compute_type="int8",
+        batch_size=4,
+        diarization_enabled=True,
+        hf_token=None,
+    )
+
+    with pytest.raises(
+        ValueError, match="HF_TOKEN is required when WhisperX diarization is enabled"
+    ):
+        pipeline.run("/tmp/example.wav")

@@ -1,4 +1,9 @@
-from services.transcript_assembly import build_transcript_artifacts, rename_speaker
+from services.transcript_assembly import (
+    build_transcript_artifacts,
+    build_transcript_artifacts_from_segments,
+    rename_speaker,
+)
+from worker.pipeline_types import Segment, Word
 
 
 def test_build_transcript_artifacts_groups_words_into_speaker_turns():
@@ -73,4 +78,48 @@ def test_rename_speaker_updates_only_matching_entry():
     assert renamed == [
         {"speaker_key": "speaker_0", "display_name": "Speaker 1"},
         {"speaker_key": "speaker_1", "display_name": "Alice"},
+    ]
+
+
+def test_build_transcript_artifacts_from_typed_segments_uses_assigned_speakers():
+    segments = [
+        Segment(
+            start=0.0,
+            end=1.0,
+            text="Hello world",
+            speaker="speaker_0",
+            words=[
+                Word(word="Hello", start=0.0, end=0.5, speaker="speaker_0"),
+                Word(word="world", start=0.5, end=1.0, speaker="speaker_0"),
+            ],
+        ),
+        Segment(
+            start=1.2,
+            end=1.5,
+            text="Hi",
+            speaker="speaker_1",
+            words=[Word(word="Hi", start=1.2, end=1.5, speaker="speaker_1")],
+        ),
+    ]
+
+    result = build_transcript_artifacts_from_segments(segments=segments, language="en")
+
+    assert result.language == "en"
+    assert result.speakers == [
+        {"speaker_key": "speaker_0", "display_name": "Speaker 1"},
+        {"speaker_key": "speaker_1", "display_name": "Speaker 2"},
+    ]
+    assert result.turns == [
+        {
+            "speaker_key": "speaker_0",
+            "start": 0.0,
+            "end": 1.0,
+            "text": "Hello world",
+        },
+        {
+            "speaker_key": "speaker_1",
+            "start": 1.2,
+            "end": 1.5,
+            "text": "Hi",
+        },
     ]
