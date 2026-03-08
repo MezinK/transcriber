@@ -27,7 +27,7 @@ export function JobRow({ job, onDelete }: JobRowProps) {
 
   return (
     <div
-      onClick={() => navigate(`/1/${job.id}`)}
+      onClick={() => navigate(`/${job.id}`)}
       className={`bg-zinc-900 rounded-lg p-4 flex items-center gap-4 cursor-pointer hover:bg-zinc-800 transition-colors border-l-4 ${BORDER_COLOR[job.status]}`}
     >
       <span className="text-zinc-200 font-medium flex-1 truncate">

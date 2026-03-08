@@ -13,8 +13,8 @@ function IndexPage() {
   const location = useLocation();
 
   const handleUploadSuccess = useCallback(() => {
-    if (location.pathname !== "/1") {
-      navigate("/1");
+    if (location.pathname !== "/") {
+      navigate("/");
     }
   }, [navigate, location.pathname]);
 

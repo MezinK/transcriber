@@ -28,7 +28,7 @@ export function TranscriptView() {
   return (
     <div>
       <button
-        onClick={() => navigate("/1")}
+        onClick={() => navigate("/")}
         className="text-zinc-500 hover:text-zinc-300 transition-colors text-sm mb-6 inline-block"
       >
         &larr; Back
