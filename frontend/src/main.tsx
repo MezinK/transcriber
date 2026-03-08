@@ -2,9 +2,10 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Landing } from "./landing/Landing";
+import { V1App } from "./versions/v1/App";
 import "./index.css";
 
-// Placeholders — replaced one at a time in tasks 5-9
+// Placeholders — replaced one at a time in tasks 6-9
 function Placeholder({ version }: { version: number }) {
   return (
     <div className="p-8 text-lg text-gray-600">
@@ -18,7 +19,8 @@ createRoot(document.getElementById("root")!).render(
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Landing />} />
-        {[1, 2, 3, 4, 5].map((v) => (
+        <Route path="/1/*" element={<V1App />} />
+        {[2, 3, 4, 5].map((v) => (
           <Route
             key={v}
             path={`/${v}/*`}
