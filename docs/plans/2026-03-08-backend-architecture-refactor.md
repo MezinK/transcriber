@@ -19,7 +19,7 @@
 - Create: `backend/src/infra/__init__.py`
 - Create: `backend/src/worker/__init__.py`
 - Create: `backend/tests/__init__.py`
-- Modify: `docker-compose.yml`
+- Create: `backend/uv.lock`
 
 **Step 1: Write the failing smoke check**
 
@@ -73,9 +73,15 @@ backend/src/worker/__init__.py
 backend/tests/__init__.py
 ```
 
-**Step 4: Update Compose paths**
+**Step 4: Keep runtime wiring unchanged for now**
 
-Modify `docker-compose.yml` so future builds target `backend/` instead of the old `api/`, `worker/`, and `shared/` package layout.
+Do not switch `docker-compose.yml` to the new backend build paths yet.
+
+Reason:
+
+- the backend skeleton is not executable at this stage
+- changing Compose early creates a false integration signal
+- runtime migration belongs with the later Docker and entrypoint migration task
 
 **Step 5: Run sync**
 
@@ -87,10 +93,12 @@ cd backend && uv sync
 
 Expected: dependencies install successfully.
 
+Commit the generated `backend/uv.lock` so the new backend project has a reproducible dependency baseline.
+
 **Step 6: Commit**
 
 ```bash
-git add backend/pyproject.toml backend/src backend/tests docker-compose.yml
+git add backend/pyproject.toml backend/src backend/tests backend/uv.lock
 git commit -m "refactor: create unified backend project"
 ```
 
