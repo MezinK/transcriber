@@ -10,6 +10,22 @@ class HealthResponse(BaseModel):
     status: str
 
 
+class SpeakerResponse(BaseModel):
+    speaker_key: str
+    display_name: str
+
+
+class TurnResponse(BaseModel):
+    speaker_key: str
+    start: float
+    end: float
+    text: str
+
+
+class RenameSpeakerRequest(BaseModel):
+    display_name: str
+
+
 class TranscriptionResponse(BaseModel):
     id: uuid.UUID
     source_filename: str
@@ -20,8 +36,9 @@ class TranscriptionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     completed_at: datetime | None
-    transcript_text: str | None = None
     segments_json: dict | None = None
+    speakers: list[SpeakerResponse] | None = None
+    turns: list[TurnResponse] | None = None
 
 
 class TranscriptionListResponse(BaseModel):

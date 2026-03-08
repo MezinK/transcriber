@@ -87,6 +87,142 @@ async def test_list_and_fetch_transcriptions(api_client):
     assert list_response.json()["items"][0]["id"] == transcription_id
     assert fetch_response.status_code == 200
     assert fetch_response.json()["id"] == transcription_id
+    assert fetch_response.json()["speakers"] is None
+    assert fetch_response.json()["turns"] is None
+
+
+@pytest.mark.asyncio
+async def test_fetch_returns_speakers_and_turns_when_present(api_client):
+    create_response = await api_client.post(
+        "/transcriptions/",
+        files={"file": ("episode.webm", b"payload", "video/webm")},
+    )
+    transcription_id = uuid.UUID(create_response.json()["id"])
+
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        artifact = await session.get(TranscriptionArtifact, transcription_id)
+        assert artifact is not None
+        artifact.speakers_json = [
+            {"speaker_key": "speaker_0", "display_name": "Speaker 1"}
+        ]
+        artifact.turns_json = [
+            {
+                "speaker_key": "speaker_0",
+                "start": 0.0,
+                "end": 1.0,
+                "text": "Hello world",
+            }
+        ]
+        await session.commit()
+
+    response = await api_client.get(f"/transcriptions/{transcription_id}")
+
+    assert response.status_code == 200
+    assert response.json()["speakers"] == [
+        {"speaker_key": "speaker_0", "display_name": "Speaker 1"}
+    ]
+    assert response.json()["turns"] == [
+        {
+            "speaker_key": "speaker_0",
+            "start": 0.0,
+            "end": 1.0,
+            "text": "Hello world",
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_patch_renames_speaker_within_transcription(api_client):
+    create_response = await api_client.post(
+        "/transcriptions/",
+        files={"file": ("rename.wav", b"payload", "audio/wav")},
+    )
+    transcription_id = uuid.UUID(create_response.json()["id"])
+
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        artifact = await session.get(TranscriptionArtifact, transcription_id)
+        assert artifact is not None
+        artifact.speakers_json = [
+            {"speaker_key": "speaker_0", "display_name": "Speaker 1"}
+        ]
+        artifact.turns_json = [
+            {
+                "speaker_key": "speaker_0",
+                "start": 0.0,
+                "end": 1.0,
+                "text": "Hello world",
+            }
+        ]
+        await session.commit()
+
+    response = await api_client.patch(
+        f"/transcriptions/{transcription_id}/speakers/speaker_0",
+        json={"display_name": "Alice"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["speakers"] == [
+        {"speaker_key": "speaker_0", "display_name": "Alice"}
+    ]
+    assert response.json()["turns"] == [
+        {
+            "speaker_key": "speaker_0",
+            "start": 0.0,
+            "end": 1.0,
+            "text": "Hello world",
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_patch_rename_returns_404_for_unknown_speaker(api_client):
+    create_response = await api_client.post(
+        "/transcriptions/",
+        files={"file": ("rename.wav", b"payload", "audio/wav")},
+    )
+    transcription_id = uuid.UUID(create_response.json()["id"])
+
+    response = await api_client.patch(
+        f"/transcriptions/{transcription_id}/speakers/speaker_missing",
+        json={"display_name": "Alice"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Speaker not found"}
+
+
+@pytest.mark.asyncio
+async def test_patch_rename_returns_409_while_processing(api_client):
+    create_response = await api_client.post(
+        "/transcriptions/",
+        files={"file": ("rename.wav", b"payload", "audio/wav")},
+    )
+    transcription_id = uuid.UUID(create_response.json()["id"])
+
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        artifact = await session.get(TranscriptionArtifact, transcription_id)
+        assert artifact is not None
+        artifact.speakers_json = [
+            {"speaker_key": "speaker_0", "display_name": "Speaker 1"}
+        ]
+        await session.commit()
+
+    await claim_next_transcription(
+        session_factory=session_factory,
+        worker_id=uuid.uuid4(),
+        lease_duration_seconds=120,
+    )
+
+    response = await api_client.patch(
+        f"/transcriptions/{transcription_id}/speakers/speaker_0",
+        json={"display_name": "Alice"},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Transcription is currently being processed"}
 
 
 @pytest.mark.asyncio

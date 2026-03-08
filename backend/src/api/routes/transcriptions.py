@@ -5,10 +5,20 @@ from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile,
 from sqlalchemy import func, select
 from sqlalchemy.orm import joinedload
 
-from api.schemas import TranscriptionListResponse, TranscriptionResponse
+from api.schemas import (
+    RenameSpeakerRequest,
+    TranscriptionListResponse,
+    TranscriptionResponse,
+)
 from infra.config import get_settings
 from infra.db import get_session_factory
 from infra.models import Transcription, TranscriptionArtifact
+from services.speakers import (
+    SpeakerNotFoundError,
+    SpeakerRenameConflictError,
+    TranscriptionNotFoundError,
+    rename_transcription_speaker,
+)
 from services.storage import UploadTooLargeError, UploadValidationError
 from services.uploads import DeleteUploadResult, create_upload, delete_upload
 
@@ -115,6 +125,39 @@ async def delete_transcription_route(transcription_id: uuid.UUID) -> Response:
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.patch("/{transcription_id}/speakers/{speaker_key}", response_model=TranscriptionResponse)
+async def rename_transcription_speaker_route(
+    transcription_id: uuid.UUID,
+    speaker_key: str,
+    payload: RenameSpeakerRequest,
+) -> TranscriptionResponse:
+    session_factory = get_session_factory()
+    try:
+        transcription = await rename_transcription_speaker(
+            session_factory=session_factory,
+            transcription_id=transcription_id,
+            speaker_key=speaker_key,
+            display_name=payload.display_name,
+        )
+    except TranscriptionNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Transcription not found",
+        ) from exc
+    except SpeakerNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Speaker not found",
+        ) from exc
+    except SpeakerRenameConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Transcription is currently being processed",
+        ) from exc
+
+    return _serialize_transcription(transcription)
+
+
 def _serialize_transcription(transcription: Transcription) -> TranscriptionResponse:
     artifact: TranscriptionArtifact | None = transcription.artifact
     return TranscriptionResponse(
@@ -127,6 +170,7 @@ def _serialize_transcription(transcription: Transcription) -> TranscriptionRespo
         created_at=transcription.created_at,
         updated_at=transcription.updated_at,
         completed_at=transcription.completed_at,
-        transcript_text=None if artifact is None else artifact.transcript_text,
         segments_json=None if artifact is None else artifact.segments_json,
+        speakers=None if artifact is None else artifact.speakers_json,
+        turns=None if artifact is None else artifact.turns_json,
     )
