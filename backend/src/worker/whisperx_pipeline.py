@@ -4,6 +4,7 @@ import gc
 from dataclasses import dataclass
 
 from services.transcript_assembly import build_transcript_artifacts_from_segments
+from worker.pipeline import PipelineStageError
 from worker.pipeline_types import (
     Segment,
     TranscriptArtifacts,
@@ -26,51 +27,85 @@ class WhisperXPipeline:
         import whisperx
 
         if self.diarization_enabled and not self.hf_token:
-            raise ValueError("HF_TOKEN is required when WhisperX diarization is enabled")
+            raise PipelineStageError(
+                "diarize",
+                ValueError("HF_TOKEN is required when WhisperX diarization is enabled"),
+            )
 
-        audio = whisperx.load_audio(file_path)
+        try:
+            audio = whisperx.load_audio(file_path)
+        except Exception as exc:
+            raise PipelineStageError("load_audio", exc) from exc
 
-        model = whisperx.load_model(
-            self.model_name,
-            self.device,
-            compute_type=self.compute_type,
-        )
-        raw_result = model.transcribe(audio, batch_size=self.batch_size)
-        del model
-        self._cleanup_memory()
+        try:
+            model = whisperx.load_model(
+                self.model_name,
+                self.device,
+                compute_type=self.compute_type,
+            )
+        except Exception as exc:
+            raise PipelineStageError("load_model", exc) from exc
+
+        try:
+            raw_result = model.transcribe(audio, batch_size=self.batch_size)
+        except Exception as exc:
+            raise PipelineStageError("transcribe", exc) from exc
+        finally:
+            del model
+            self._cleanup_memory()
 
         language = raw_result.get("language")
-        align_model, metadata = whisperx.load_align_model(
-            language_code=language,
-            device=self.device,
-        )
-        aligned_result = whisperx.align(
-            raw_result["segments"],
-            align_model,
-            metadata,
-            audio,
-            self.device,
-            return_char_alignments=False,
-        )
-        del align_model
-        self._cleanup_memory()
+        try:
+            align_model, metadata = whisperx.load_align_model(
+                language_code=language,
+                device=self.device,
+            )
+        except Exception as exc:
+            raise PipelineStageError("load_align_model", exc) from exc
+
+        try:
+            aligned_result = whisperx.align(
+                raw_result["segments"],
+                align_model,
+                metadata,
+                audio,
+                self.device,
+                return_char_alignments=False,
+            )
+        except Exception as exc:
+            raise PipelineStageError("align", exc) from exc
+        finally:
+            del align_model
+            self._cleanup_memory()
 
         speaker_annotated = aligned_result
         if self.diarization_enabled:
             from whisperx.diarize import DiarizationPipeline
 
-            diarizer = DiarizationPipeline(token=self.hf_token, device=self.device)
-            diarize_segments = diarizer(
-                audio,
-                min_speakers=self.min_speakers,
-                max_speakers=self.max_speakers,
-            )
-            speaker_annotated = whisperx.assign_word_speakers(
-                diarize_segments,
-                aligned_result,
-            )
-            del diarizer
-            self._cleanup_memory()
+            try:
+                diarizer = DiarizationPipeline(token=self.hf_token, device=self.device)
+            except Exception as exc:
+                raise PipelineStageError("load_diarizer", exc) from exc
+
+            try:
+                diarize_segments = diarizer(
+                    audio,
+                    min_speakers=self.min_speakers,
+                    max_speakers=self.max_speakers,
+                )
+            except Exception as exc:
+                raise PipelineStageError("diarize", exc) from exc
+
+            try:
+                speaker_annotated = whisperx.assign_word_speakers(
+                    diarize_segments,
+                    aligned_result,
+                )
+            except Exception as exc:
+                raise PipelineStageError("assign_word_speakers", exc) from exc
+            finally:
+                del diarizer
+                self._cleanup_memory()
 
         segments = [
             _segment_from_dict(segment)

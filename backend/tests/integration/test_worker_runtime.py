@@ -30,10 +30,10 @@ from infra.models import (
     WorkerStatus,
 )
 from services.jobs import recover_stale_leases
-from worker.diarization import SpeakerSpan
-from worker.engine import TranscriptionResult
 from worker import main as worker_main
 from worker.main import WorkerRuntime
+from worker.pipeline import PipelineStageError
+from worker.pipeline_types import Segment, TranscriptArtifacts, Word
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = BACKEND_ROOT / "alembic.ini"
@@ -227,6 +227,24 @@ async def _seed_stale_processing_transcription(
         return transcription.id, upload_path
 
 
+async def _seed_stale_idle_worker(
+    session_factory,
+    *,
+    worker_id: uuid.UUID,
+    now: datetime,
+) -> None:
+    async with session_factory() as session:
+        async with session.begin():
+            worker = Worker(
+                id=worker_id,
+                label="stale-idle-worker",
+                status=WorkerStatus.IDLE,
+                started_at=now - timedelta(minutes=10),
+                last_heartbeat=now - timedelta(minutes=10),
+            )
+            session.add(worker)
+
+
 async def _wait_for(predicate, timeout_seconds: float = 5.0) -> None:
     deadline = time.monotonic() + timeout_seconds
     while time.monotonic() < deadline:
@@ -236,62 +254,86 @@ async def _wait_for(predicate, timeout_seconds: float = 5.0) -> None:
     raise AssertionError("Timed out waiting for condition")
 
 
-class SuccessfulEngine:
+class SuccessfulPipeline:
     def __init__(self, text: str = "done") -> None:
         self.text = text
 
-    def transcribe(self, file_path: str) -> TranscriptionResult:
-        return TranscriptionResult(
-            text=self.text,
+    def run(self, file_path: str) -> TranscriptArtifacts:
+        return TranscriptArtifacts(
+            language="en",
             segments=[
+                Segment(
+                    start=0.0,
+                    end=1.0,
+                    text=self.text,
+                    speaker="speaker_0",
+                    words=[
+                        Word(
+                            word=self.text,
+                            start=0.0,
+                            end=1.0,
+                            speaker="speaker_0",
+                        )
+                    ],
+                )
+            ],
+            speakers=[{"speaker_key": "speaker_0", "display_name": "Speaker 1"}],
+            turns=[
                 {
-                    "text": self.text,
+                    "speaker_key": "speaker_0",
                     "start": 0.0,
                     "end": 1.0,
-                    "words": [
-                        {
-                            "word": self.text,
-                            "start": 0.0,
-                            "end": 1.0,
-                            "probability": 0.9,
-                        }
-                    ],
+                    "text": self.text,
                 }
             ],
         )
 
 
-class FailingEngine:
-    def transcribe(self, file_path: str) -> TranscriptionResult:
-        raise RuntimeError("engine blew up")
+class FailingPipeline:
+    def run(self, file_path: str) -> TranscriptArtifacts:
+        raise PipelineStageError("transcribe", RuntimeError("engine blew up"))
 
 
-class SuccessfulDiarizationEngine:
-    def diarize(self, file_path: str) -> list[SpeakerSpan]:
-        return [SpeakerSpan(speaker_key="speaker_0", start=0.0, end=10.0)]
-
-
-class BlockingEngine:
+class BlockingPipeline:
     def __init__(self) -> None:
         self.started = threading.Event()
         self.release = threading.Event()
 
-    def transcribe(self, file_path: str) -> TranscriptionResult:
+    def run(self, file_path: str) -> TranscriptArtifacts:
         self.started.set()
         self.release.wait(timeout=10)
-        return TranscriptionResult(
-            text="blocked",
-            segments=[{"text": "blocked", "start": 0.0, "end": 1.0}],
+        return TranscriptArtifacts(
+            language="en",
+            segments=[
+                Segment(
+                    start=0.0,
+                    end=1.0,
+                    text="blocked",
+                    speaker="unknown",
+                    words=[],
+                )
+            ],
+            speakers=[
+                {"speaker_key": "unknown", "display_name": "Unknown Speaker"}
+            ],
+            turns=[
+                {
+                    "speaker_key": "unknown",
+                    "start": 0.0,
+                    "end": 1.0,
+                    "text": "blocked",
+                }
+            ],
         )
 
 
 @pytest.mark.asyncio
 async def test_worker_claims_a_pending_job(database: DatabaseHarness, tmp_path: Path):
     transcription_id, _ = await _seed_transcription(database.session_factory, tmp_path)
-    engine = BlockingEngine()
+    pipeline = BlockingPipeline()
     runtime = WorkerRuntime(
         session_factory=database.session_factory,
-        engine=engine,
+        pipeline=pipeline,
         heartbeat_interval_seconds=5.0,
         lease_duration_seconds=30,
         poll_interval_seconds=1.0,
@@ -300,7 +342,7 @@ async def test_worker_claims_a_pending_job(database: DatabaseHarness, tmp_path: 
     )
 
     task = asyncio.create_task(runtime.run_once())
-    await _wait_for(engine.started.is_set)
+    await _wait_for(pipeline.started.is_set)
 
     async with database.session_factory() as session:
         transcription = await session.get(Transcription, transcription_id)
@@ -312,7 +354,7 @@ async def test_worker_claims_a_pending_job(database: DatabaseHarness, tmp_path: 
     assert worker.status == WorkerStatus.PROCESSING
     assert worker.current_transcription_id == transcription_id
 
-    engine.release.set()
+    pipeline.release.set()
     await task
     await runtime.close()
 
@@ -323,10 +365,10 @@ async def test_heartbeat_renews_lease_during_work(
     tmp_path: Path,
 ):
     transcription_id, _ = await _seed_transcription(database.session_factory, tmp_path)
-    engine = BlockingEngine()
+    pipeline = BlockingPipeline()
     runtime = WorkerRuntime(
         session_factory=database.session_factory,
-        engine=engine,
+        pipeline=pipeline,
         heartbeat_interval_seconds=0.1,
         lease_duration_seconds=1,
         poll_interval_seconds=1.0,
@@ -334,7 +376,7 @@ async def test_heartbeat_renews_lease_during_work(
     )
 
     task = asyncio.create_task(runtime.run_once())
-    await _wait_for(engine.started.is_set)
+    await _wait_for(pipeline.started.is_set)
 
     async with database.session_factory() as session:
         first_lease = await session.get(JobLease, transcription_id)
@@ -347,7 +389,7 @@ async def test_heartbeat_renews_lease_during_work(
 
     assert renewed_lease.leased_until > first_expiry
 
-    engine.release.set()
+    pipeline.release.set()
     await task
     await runtime.close()
 
@@ -362,8 +404,7 @@ async def test_completion_writes_results_and_clears_lease(
     )
     runtime = WorkerRuntime(
         session_factory=database.session_factory,
-        engine=SuccessfulEngine("final text"),
-        diarization_engine=SuccessfulDiarizationEngine(),
+        pipeline=SuccessfulPipeline("final text"),
         heartbeat_interval_seconds=1.0,
         lease_duration_seconds=30,
         poll_interval_seconds=1.0,
@@ -407,7 +448,7 @@ async def test_failure_requeues_with_incremented_attempt_count(
     )
     runtime = WorkerRuntime(
         session_factory=database.session_factory,
-        engine=FailingEngine(),
+        pipeline=FailingPipeline(),
         heartbeat_interval_seconds=1.0,
         lease_duration_seconds=30,
         poll_interval_seconds=1.0,
@@ -424,7 +465,7 @@ async def test_failure_requeues_with_incremented_attempt_count(
     assert processed is True
     assert transcription.status == TranscriptionStatus.PENDING
     assert transcription.attempt_count == 1
-    assert transcription.error == "Transcription failed: RuntimeError"
+    assert transcription.error == "pipeline.transcribe: RuntimeError: engine blew up"
     assert lease is None
     assert upload_path.exists() is True
     await runtime.close()
@@ -437,10 +478,10 @@ async def test_shutdown_preserves_recoverable_state(
 ):
     now = datetime(2026, 3, 8, 16, 30, tzinfo=UTC)
     transcription_id, _ = await _seed_transcription(database.session_factory, tmp_path)
-    engine = BlockingEngine()
+    pipeline = BlockingPipeline()
     runtime = WorkerRuntime(
         session_factory=database.session_factory,
-        engine=engine,
+        pipeline=pipeline,
         heartbeat_interval_seconds=10.0,
         lease_duration_seconds=1,
         poll_interval_seconds=1.0,
@@ -449,14 +490,14 @@ async def test_shutdown_preserves_recoverable_state(
     )
 
     task = asyncio.create_task(runtime.run_once())
-    await _wait_for(engine.started.is_set)
+    await _wait_for(pipeline.started.is_set)
     assert runtime.current_claim is not None
 
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
 
-    engine.release.set()
+    pipeline.release.set()
     await asyncio.sleep(0.1)
 
     async with database.session_factory() as session:
@@ -506,8 +547,7 @@ async def test_run_recovers_stale_leases_during_busy_iterations(
 
     runtime = WorkerRuntime(
         session_factory=database.session_factory,
-        engine=SuccessfulEngine("busy pass"),
-        diarization_engine=SuccessfulDiarizationEngine(),
+        pipeline=SuccessfulPipeline("busy pass"),
         heartbeat_interval_seconds=1.0,
         lease_duration_seconds=30,
         poll_interval_seconds=1.0,
@@ -537,4 +577,47 @@ async def test_run_recovers_stale_leases_during_busy_iterations(
     assert stale.error == "Lease expired; job returned to queue"
     assert stale_lease is None
     assert stale_worker.status == WorkerStatus.STALE
+    await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_run_prunes_stale_inactive_workers(
+    database: DatabaseHarness,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    now = datetime(2026, 3, 8, 18, 0, tzinfo=UTC)
+    stale_worker_id = uuid.uuid4()
+    await _seed_stale_idle_worker(
+        database.session_factory,
+        worker_id=stale_worker_id,
+        now=now,
+    )
+    await _seed_transcription(database.session_factory, tmp_path)
+
+    runtime = WorkerRuntime(
+        session_factory=database.session_factory,
+        pipeline=SuccessfulPipeline("cleanup pass"),
+        heartbeat_interval_seconds=1.0,
+        lease_duration_seconds=30,
+        poll_interval_seconds=1.0,
+        upload_dir=str(tmp_path),
+        max_attempts=3,
+        now_factory=lambda: now,
+    )
+
+    original_complete = worker_main.complete_transcription
+
+    async def complete_and_stop(*args, **kwargs):
+        await original_complete(*args, **kwargs)
+        runtime.request_shutdown()
+
+    monkeypatch.setattr(worker_main, "complete_transcription", complete_and_stop)
+
+    await asyncio.wait_for(runtime.run(), timeout=5)
+
+    async with database.session_factory() as session:
+        stale_worker = await session.get(Worker, stale_worker_id)
+
+    assert stale_worker is None
     await runtime.close()

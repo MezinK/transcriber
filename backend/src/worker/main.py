@@ -10,6 +10,7 @@ import uuid
 
 from infra.config import get_settings
 from infra.db import get_session_factory
+from infra.ids import generate_uuid
 from infra.time import utc_now
 from services.jobs import (
     LeaseNotOwnedError,
@@ -19,10 +20,8 @@ from services.jobs import (
     recover_stale_leases,
     renew_lease,
 )
-from services.transcript_assembly import build_transcript_artifacts_from_segments
 from services.workers import cleanup_stale_workers, heartbeat_worker, register_worker
-from worker.diarization import DiarizationEngine, load_diarization_engine
-from worker.engine import TranscriptionEngine, load_engine
+from worker.pipeline import PipelineStageError, TranscriptionPipeline, load_pipeline
 
 
 class WorkerRuntime:
@@ -30,8 +29,7 @@ class WorkerRuntime:
         self,
         *,
         session_factory,
-        engine: TranscriptionEngine,
-        diarization_engine: DiarizationEngine | None = None,
+        pipeline: TranscriptionPipeline,
         worker_id: uuid.UUID | None = None,
         label: str | None = None,
         lease_duration_seconds: int,
@@ -42,9 +40,8 @@ class WorkerRuntime:
         now_factory=lambda: utc_now(),
     ) -> None:
         self.session_factory = session_factory
-        self.engine = engine
-        self.diarization_engine = diarization_engine
-        self.worker_id = worker_id or uuid.uuid7()
+        self.pipeline = pipeline
+        self.worker_id = worker_id or generate_uuid()
         self.label = label or f"worker-{str(self.worker_id)[:8]}"
         self.lease_duration_seconds = lease_duration_seconds
         self.heartbeat_interval_seconds = heartbeat_interval_seconds
@@ -127,34 +124,16 @@ class WorkerRuntime:
         try:
             result = await asyncio.get_running_loop().run_in_executor(
                 self._executor,
-                functools.partial(self.engine.transcribe, claim.upload_path),
+                functools.partial(self.pipeline.run, claim.upload_path),
             )
-            speaker_spans = (
-                []
-                if self.diarization_engine is None
-                else await asyncio.get_running_loop().run_in_executor(
-                    self._executor,
-                    functools.partial(self.diarization_engine.diarize, claim.upload_path),
-                )
-            )
-            artifacts = build_transcript_artifacts_from_segments(
-                segments=result.segments,
-                speaker_spans=[
-                    {
-                        "speaker_key": span.speaker_key,
-                        "start": span.start,
-                        "end": span.end,
-                    }
-                    for span in speaker_spans
-                ],
-            )
+            payload = result.to_payload()
             await complete_transcription(
                 session_factory=self.session_factory,
                 transcription_id=claim.transcription_id,
                 worker_id=self.worker_id,
-                segments_json={"segments": result.segments},
-                speakers_json=artifacts.speakers,
-                turns_json=artifacts.turns,
+                segments_json=payload["segments_json"],
+                speakers_json=payload["speakers_json"],
+                turns_json=payload["turns_json"],
                 upload_dir=self.upload_dir,
                 now_factory=self.now_factory,
             )
@@ -167,7 +146,7 @@ class WorkerRuntime:
                 session_factory=self.session_factory,
                 transcription_id=claim.transcription_id,
                 worker_id=self.worker_id,
-                error=f"Transcription failed: {type(exc).__name__}",
+                error=_format_pipeline_error(exc),
                 max_attempts=self.max_attempts,
                 retryable=True,
                 upload_dir=self.upload_dir,
@@ -209,26 +188,9 @@ class WorkerRuntime:
 
 async def main() -> None:
     settings = get_settings()
-    if settings.transcription_backend != "whisperx":
-        raise ValueError(
-            f"Unsupported transcription backend: {settings.transcription_backend}"
-        )
-    diarization_engine_name = (
-        "pyannote" if settings.whisper_diarization_enabled else "none"
-    )
     runtime = WorkerRuntime(
         session_factory=get_session_factory(),
-        engine=load_engine(
-            model_size=settings.whisper_model,
-            device=settings.whisper_device,
-            compute_type=settings.whisper_compute_type,
-            hf_token=settings.hf_token,
-        ),
-        diarization_engine=load_diarization_engine(
-            diarization_engine_name,
-            auth_token=settings.hf_token,
-            device=settings.whisper_device,
-        ),
+        pipeline=load_pipeline(settings),
         lease_duration_seconds=settings.lease_duration_seconds,
         heartbeat_interval_seconds=settings.heartbeat_interval_seconds,
         poll_interval_seconds=settings.worker_poll_interval_seconds,
@@ -247,3 +209,9 @@ async def main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+
+def _format_pipeline_error(exc: Exception) -> str:
+    if isinstance(exc, PipelineStageError):
+        return f"pipeline.{exc.stage}: {exc.detail}"
+    return f"pipeline.run: {type(exc).__name__}: {exc}"

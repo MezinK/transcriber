@@ -4,7 +4,15 @@ from typing import Protocol
 
 from infra.config import Settings
 from worker.pipeline_types import TranscriptArtifacts
-from worker.whisperx_pipeline import WhisperXPipeline
+
+
+class PipelineStageError(RuntimeError):
+    def __init__(self, stage: str, cause: Exception | str) -> None:
+        self.stage = stage
+        self.cause = cause
+        detail = cause if isinstance(cause, str) else f"{type(cause).__name__}: {cause}"
+        self.detail = detail
+        super().__init__(detail)
 
 
 class TranscriptionPipeline(Protocol):
@@ -12,6 +20,8 @@ class TranscriptionPipeline(Protocol):
 
 
 def load_pipeline(settings: Settings) -> TranscriptionPipeline:
+    from worker.whisperx_pipeline import WhisperXPipeline
+
     if settings.transcription_backend != "whisperx":
         raise ValueError(
             f"Unsupported transcription backend: {settings.transcription_backend}"

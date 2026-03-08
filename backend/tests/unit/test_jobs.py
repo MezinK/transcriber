@@ -40,6 +40,9 @@ class FakeSession:
         scalar = self.scalars.pop(0) if self.scalars else None
         return FakeResult(scalar)
 
+    async def get(self, model, ident, with_for_update=False):
+        return None
+
     def add(self, instance: object) -> None:
         self.added.append(instance)
 
