@@ -3,6 +3,7 @@ import sys
 
 import pytest
 
+from worker.pipeline import PipelineStageError
 from worker.whisperx_pipeline import WhisperXPipeline
 
 
@@ -153,6 +154,7 @@ def test_whisperx_pipeline_requires_token_when_diarization_enabled():
     )
 
     with pytest.raises(
-        ValueError, match="HF_TOKEN is required when WhisperX diarization is enabled"
+        PipelineStageError,
+        match="ValueError: HF_TOKEN is required when WhisperX diarization is enabled",
     ):
         pipeline.run("/tmp/example.wav")

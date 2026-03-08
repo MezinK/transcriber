@@ -111,13 +111,12 @@ async def heartbeat_worker(
 ) -> bool:
     async with session_factory() as session:
         async with session.begin():
-            return await apply_worker_state(
-                session,
-                worker_id=worker_id,
-                status=WorkerStatus.IDLE,
-                now=now(),
-                current_transcription_id=None,
-            )
+            worker = await session.get(Worker, worker_id, with_for_update=True)
+            if worker is None:
+                return False
+
+            worker.last_heartbeat = now()
+            return True
 
 
 async def set_worker_current_job(
