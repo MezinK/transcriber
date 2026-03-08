@@ -16,8 +16,8 @@ Unified backend project for the local transcription tool.
 - Local uploads default to `backend/var/uploads`.
 - Docker Compose overrides `UPLOAD_DIR` to `/uploads` inside the containers.
 - Worker defaults to `TRANSCRIPTION_BACKEND=whisperx`, `WHISPER_MODEL=base`, `WHISPER_DEVICE=cpu`, `WHISPER_COMPUTE_TYPE=int8`, and `WHISPER_BATCH_SIZE=4`.
-- Diarization defaults to `WHISPER_DIARIZATION_ENABLED=true`.
-- `HF_TOKEN` is required only when WhisperX diarization is enabled, and that token must have accepted the Hugging Face model terms WhisperX depends on for diarization.
+- Diarization defaults to `WHISPER_DIARIZATION_ENABLED=false`.
+- `HF_TOKEN` is required when WhisperX diarization is enabled, and that token must have accepted the Hugging Face model terms WhisperX depends on for diarization.
 - Docker Compose runs the worker as `linux/amd64` so the current WhisperX stack stays on the most stable wheel path across hosts.
 
 ## WhisperX Planning Guardrail

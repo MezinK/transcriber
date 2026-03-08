@@ -81,3 +81,11 @@ def test_load_pipeline_returns_whisperx_pipeline():
 def test_load_pipeline_rejects_unknown_backend():
     with pytest.raises(ValueError, match="Unsupported transcription backend"):
         load_pipeline(Settings(transcription_backend="unknown"))
+
+
+def test_load_pipeline_requires_token_when_diarization_enabled():
+    with pytest.raises(
+        ValueError,
+        match="HF_TOKEN is required when WhisperX diarization is enabled",
+    ):
+        load_pipeline(Settings(whisper_diarization_enabled=True, hf_token=None))

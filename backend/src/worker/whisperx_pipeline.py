@@ -23,14 +23,14 @@ class WhisperXPipeline:
     min_speakers: int | None = None
     max_speakers: int | None = None
 
+    def __post_init__(self) -> None:
+        if self.diarization_enabled and not self.hf_token:
+            raise ValueError(
+                "HF_TOKEN is required when WhisperX diarization is enabled"
+            )
+
     def run(self, file_path: str) -> TranscriptArtifacts:
         import whisperx
-
-        if self.diarization_enabled and not self.hf_token:
-            raise PipelineStageError(
-                "diarize",
-                ValueError("HF_TOKEN is required when WhisperX diarization is enabled"),
-            )
 
         try:
             audio = whisperx.load_audio(file_path)

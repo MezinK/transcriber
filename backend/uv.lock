@@ -195,6 +195,7 @@ dependencies = [
     { name = "alembic" },
     { name = "asyncpg" },
     { name = "fastapi", extra = ["standard"] },
+    { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "python-multipart" },
@@ -211,7 +212,6 @@ worker = [
 dev = [
     { name = "aiosqlite" },
     { name = "httpx" },
-    { name = "psycopg", extra = ["binary"] },
     { name = "pytest" },
     { name = "pytest-asyncio" },
 ]
@@ -222,6 +222,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.14" },
     { name = "asyncpg", specifier = ">=0.30" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.115" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pydantic-settings", specifier = ">=2.0" },
     { name = "python-multipart", specifier = ">=0.0.18" },
@@ -235,7 +236,6 @@ provides-extras = ["worker"]
 dev = [
     { name = "aiosqlite", specifier = ">=0.21" },
     { name = "httpx", specifier = ">=0.28" },
-    { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
     { name = "pytest", specifier = ">=8.0" },
     { name = "pytest-asyncio", specifier = ">=0.25" },
 ]

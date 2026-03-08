@@ -23,7 +23,7 @@ async def test_get_settings_reads_local_defaults():
     assert settings.whisper_device == "cpu"
     assert settings.whisper_compute_type == "int8"
     assert settings.whisper_batch_size == 4
-    assert settings.whisper_diarization_enabled is True
+    assert settings.whisper_diarization_enabled is False
     assert settings.whisper_min_speakers is None
     assert settings.whisper_max_speakers is None
     assert settings.hf_token is None

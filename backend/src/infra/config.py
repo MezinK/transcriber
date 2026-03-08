@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     whisper_device: str = "cpu"
     whisper_compute_type: str = "int8"
     whisper_batch_size: int = Field(default=4, gt=0)
-    whisper_diarization_enabled: bool = True
+    whisper_diarization_enabled: bool = False
     whisper_min_speakers: int | None = Field(default=None, gt=0)
     whisper_max_speakers: int | None = Field(default=None, gt=0)
     hf_token: str | None = None

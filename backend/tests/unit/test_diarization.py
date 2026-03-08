@@ -144,17 +144,15 @@ def test_whisperx_pipeline_runs_full_flow(monkeypatch):
 
 
 def test_whisperx_pipeline_requires_token_when_diarization_enabled():
-    pipeline = WhisperXPipeline(
-        model_name="base",
-        device="cpu",
-        compute_type="int8",
-        batch_size=4,
-        diarization_enabled=True,
-        hf_token=None,
-    )
-
     with pytest.raises(
-        PipelineStageError,
-        match="ValueError: HF_TOKEN is required when WhisperX diarization is enabled",
+        ValueError,
+        match="HF_TOKEN is required when WhisperX diarization is enabled",
     ):
-        pipeline.run("/tmp/example.wav")
+        WhisperXPipeline(
+            model_name="base",
+            device="cpu",
+            compute_type="int8",
+            batch_size=4,
+            diarization_enabled=True,
+            hf_token=None,
+        )
