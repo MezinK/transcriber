@@ -12,7 +12,7 @@ from alembic.script import ScriptDirectory
 import psycopg
 from psycopg import sql
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 REPO_ROOT = BACKEND_ROOT.parent
@@ -24,6 +24,7 @@ POSTGRES_IMAGE = "postgres:17"
 class AppliedDatabase:
     current_revision: str | None
     head_revision: str | None
+    database_url: str
 
 
 def _run_command(*args: str) -> str:
@@ -143,6 +144,7 @@ def applied_database() -> Iterator[AppliedDatabase]:
         yield AppliedDatabase(
             current_revision=current_revision,
             head_revision=script.get_current_head(),
+            database_url=database_url,
         )
     finally:
         try:
@@ -155,3 +157,16 @@ def applied_database() -> Iterator[AppliedDatabase]:
 
 def test_alembic_upgrade_head(applied_database: AppliedDatabase):
     assert applied_database.current_revision == applied_database.head_revision
+
+    engine = create_engine(applied_database.database_url)
+    try:
+        columns = {
+            column["name"]
+            for column in inspect(engine).get_columns("transcription_artifacts")
+        }
+    finally:
+        engine.dispose()
+
+    assert "speakers_json" in columns
+    assert "turns_json" in columns
+    assert "transcript_text" not in columns

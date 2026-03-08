@@ -82,8 +82,9 @@ class TranscriptionArtifact(Base):
         primary_key=True,
     )
     upload_path: Mapped[str] = mapped_column(Text, nullable=False)
-    transcript_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     segments_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    speakers_json: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
+    turns_json: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
 
     transcription: Mapped[Transcription] = relationship(back_populates="artifact")
 
@@ -138,4 +139,3 @@ class Worker(Base):
         nullable=True,
     )
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
-
