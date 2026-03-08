@@ -37,7 +37,6 @@ services:
         condition: service_completed_successfully
 
   worker:
-    platform: linux/amd64
     build:
       context: .
       dockerfile: backend/Dockerfile
