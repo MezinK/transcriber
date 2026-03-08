@@ -27,4 +27,3 @@ def load_pipeline(settings: Settings) -> TranscriptionPipeline:
         min_speakers=settings.whisper_min_speakers,
         max_speakers=settings.whisper_max_speakers,
     )
-

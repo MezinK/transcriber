@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True, slots=True)
@@ -12,12 +11,12 @@ class Word:
     score: float | None = None
     speaker: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        payload: dict[str, Any] = {"word": self.word}
-        if self.start is not None:
-            payload["start"] = self.start
-        if self.end is not None:
-            payload["end"] = self.end
+    def to_dict(self) -> dict:
+        payload = {
+            "word": self.word,
+            "start": self.start,
+            "end": self.end,
+        }
         if self.score is not None:
             payload["score"] = self.score
         if self.speaker is not None:
@@ -30,19 +29,18 @@ class Segment:
     start: float
     end: float
     text: str
-    words: list[Word] = field(default_factory=list)
+    words: list[Word]
     speaker: str | None = None
     avg_logprob: float | None = None
     no_speech_prob: float | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        payload: dict[str, Any] = {
+    def to_dict(self) -> dict:
+        payload = {
             "start": self.start,
             "end": self.end,
             "text": self.text,
+            "words": [word.to_dict() for word in self.words],
         }
-        if self.words:
-            payload["words"] = [word.to_dict() for word in self.words]
         if self.speaker is not None:
             payload["speaker"] = self.speaker
         if self.avg_logprob is not None:
@@ -56,13 +54,19 @@ class Segment:
 class TranscriptArtifacts:
     language: str | None
     segments: list[Segment]
-    speakers: list[dict[str, Any]]
-    turns: list[dict[str, Any]]
+    speakers: list[dict]
+    turns: list[dict]
 
-    def to_payload(self) -> dict[str, Any]:
+    def to_payload(self) -> dict:
         return {
-            "segments_json": {"segments": [segment.to_dict() for segment in self.segments]},
+            "segments_json": {
+                "segments": [segment.to_dict() for segment in self.segments]
+            },
             "speakers_json": [dict(speaker) for speaker in self.speakers],
             "turns_json": [dict(turn) for turn in self.turns],
         }
 
+
+TranscriptWord = Word
+TranscriptSegment = Segment
+PipelineResult = TranscriptArtifacts

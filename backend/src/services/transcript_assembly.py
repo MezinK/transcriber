@@ -13,7 +13,7 @@ def _speaker_for_word(word: dict, speaker_spans: list[dict]) -> str:
     midpoint = (float(word["start"]) + float(word["end"])) / 2
     for span in speaker_spans:
         if float(span["start"]) <= midpoint <= float(span["end"]):
-            return str(span["speaker_key"])
+            return _normalize_speaker_key(str(span["speaker_key"]))
     return UNKNOWN_SPEAKER_KEY
 
 
@@ -30,6 +30,15 @@ def _append_token(text: str, token: str) -> str:
     if text[-1] in "([{":
         return f"{text}{stripped}"
     return f"{text} {stripped}"
+
+
+def _normalize_speaker_key(value: str | None) -> str:
+    if value is None:
+        return UNKNOWN_SPEAKER_KEY
+    stripped = value.strip()
+    if not stripped:
+        return UNKNOWN_SPEAKER_KEY
+    return stripped.lower()
 
 
 def build_transcript_artifacts(
@@ -208,7 +217,9 @@ def _iter_segment_tokens(segment: Segment) -> Iterable[dict[str, Any]]:
                 "word": token,
                 "start": start,
                 "end": end,
-                "speaker_key": word.speaker or segment.speaker or UNKNOWN_SPEAKER_KEY,
+                "speaker_key": _normalize_speaker_key(
+                    word.speaker or segment.speaker or UNKNOWN_SPEAKER_KEY
+                ),
             }
         return
 
@@ -220,7 +231,9 @@ def _iter_segment_tokens(segment: Segment) -> Iterable[dict[str, Any]]:
         "word": token,
         "start": segment.start,
         "end": segment.end,
-        "speaker_key": segment.speaker or UNKNOWN_SPEAKER_KEY,
+        "speaker_key": _normalize_speaker_key(
+            segment.speaker or UNKNOWN_SPEAKER_KEY
+        ),
     }
 
 
