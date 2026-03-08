@@ -22,7 +22,19 @@ export function TranscriptView() {
   }
 
   if (error || !job) {
-    return <p className="text-red-400 text-sm">{error ?? "Not found"}</p>;
+    return (
+      <div>
+        <p className="text-red-400 text-sm mb-4">
+          {typeof error === "string" ? error : "Not found"}
+        </p>
+        <button
+          onClick={() => navigate("/")}
+          className="text-zinc-500 hover:text-zinc-300 transition-colors text-sm"
+        >
+          &larr; Back
+        </button>
+      </div>
+    );
   }
 
   return (
