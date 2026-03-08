@@ -28,7 +28,7 @@ services:
       DATABASE_URL: "postgresql+asyncpg://app:app@postgres:5432/transcriptions"
       UPLOAD_DIR: /uploads
       MAX_UPLOAD_BYTES: "524288000"  # 500 MB
-    command: ["sh", "-c", "uv run uvicorn api.main:app --host 0.0.0.0 --port 8000"]
+    command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
     volumes:
       - uploads:/uploads
     depends_on:
@@ -44,7 +44,7 @@ services:
       UPLOAD_DIR: /uploads
       TRANSCRIPTION_ENGINE: faster-whisper
       WHISPER_MODEL: base
-    command: ["sh", "-c", "uv run python -m worker.main"]
+    command: ["python", "-m", "worker.main"]
     volumes:
       - uploads:/uploads
     restart: unless-stopped
@@ -62,7 +62,7 @@ services:
     environment:
       DATABASE_URL: "postgresql+asyncpg://app:app@postgres:5432/transcriptions"
       UPLOAD_DIR: /uploads
-    command: ["sh", "-c", "uv run alembic upgrade head"]
+    command: ["alembic", "upgrade", "head"]
     depends_on:
       postgres:
         condition: service_healthy

@@ -5,6 +5,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.6.9 /uv /uvx /bin/
 RUN useradd --create-home --no-log-init appuser
 
 WORKDIR /app/backend
+ENV PATH="/app/backend/.venv/bin:$PATH"
 
 COPY backend/pyproject.toml backend/uv.lock /app/backend/
 COPY backend/src/api/__init__.py /app/backend/src/api/__init__.py
