@@ -6,15 +6,8 @@ import { V1App } from "./versions/v1/App.tsx";
 import { V2App } from "./versions/v2/App.tsx";
 import { V3App } from "./versions/v3/App.tsx";
 import { V4App } from "./versions/v4/App.tsx";
+import { V5App } from "./versions/v5/App.tsx";
 import "./index.css";
-
-function Placeholder({ version }: { version: number }) {
-  return (
-    <div className="p-8 text-lg text-gray-600">
-      Version {version} — coming soon
-    </div>
-  );
-}
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -25,9 +18,7 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/2/*" element={<V2App />} />
         <Route path="/3/*" element={<V3App />} />
         <Route path="/4/*" element={<V4App />} />
-        {[5].map((v) => (
-          <Route key={v} path={`/${v}/*`} element={<Placeholder version={v} />} />
-        ))}
+        <Route path="/5/*" element={<V5App />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>
