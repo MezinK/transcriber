@@ -1,9 +1,9 @@
 import { useState, useCallback } from "react";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
-import { UploadArea } from "./UploadArea.tsx";
-import { JobList } from "./JobList.tsx";
-import { WorkerList } from "./WorkerList.tsx";
-import { TranscriptView } from "./TranscriptView.tsx";
+import { UploadArea } from "./UploadArea";
+import { JobList } from "./JobList";
+import { WorkerList } from "./WorkerList";
+import { TranscriptView } from "./TranscriptView";
 
 type Tab = "transcriptions" | "workers";
 
@@ -13,7 +13,6 @@ function IndexPage() {
   const location = useLocation();
 
   const handleUploadSuccess = useCallback(() => {
-    // Navigate to index to see the new job in the list
     if (location.pathname !== "/1") {
       navigate("/1");
     }
@@ -26,27 +25,24 @@ function IndexPage() {
 
   return (
     <>
-      <nav className="flex gap-6 mb-10">
+      <div className="rounded-lg bg-zinc-800 p-1 inline-flex mb-8">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`
-              pb-2 text-sm font-medium transition-colors duration-200
-              ${
-                activeTab === tab.key
-                  ? "text-slate-800 border-b-2 border-slate-800"
-                  : "text-slate-400 hover:text-slate-600"
-              }
-            `}
+            className={`px-4 py-1.5 rounded-md text-sm transition-colors ${
+              activeTab === tab.key
+                ? "bg-zinc-700 text-zinc-100 ring-1 ring-zinc-600"
+                : "text-zinc-400 hover:text-zinc-300"
+            }`}
           >
             {tab.label}
           </button>
         ))}
-      </nav>
+      </div>
 
       {activeTab === "transcriptions" ? (
-        <div className="space-y-8">
+        <div className="space-y-6">
           <UploadArea onSuccess={handleUploadSuccess} />
           <JobList />
         </div>
@@ -60,13 +56,13 @@ function IndexPage() {
 export function V1App() {
   return (
     <div
-      className="min-h-screen bg-white"
-      style={{ fontFamily: "'DM Sans', sans-serif" }}
+      className="min-h-screen bg-zinc-950 text-zinc-200"
+      style={{ fontFamily: "'Geist Sans', 'IBM Plex Sans', sans-serif" }}
     >
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');`}</style>
-      <div className="max-w-4xl mx-auto py-12 px-6">
-        <h1 className="text-xs uppercase tracking-widest text-slate-400 mb-8">
-          Transcriptions
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');`}</style>
+      <div className="max-w-3xl mx-auto py-10 px-6">
+        <h1 className="text-sm text-zinc-500 uppercase tracking-wider mb-6">
+          Transcriber
         </h1>
 
         <Routes>
