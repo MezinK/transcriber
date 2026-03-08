@@ -85,8 +85,12 @@ async def test_list_and_fetch_transcriptions(api_client):
     assert list_response.status_code == 200
     assert list_response.json()["total"] == 1
     assert list_response.json()["items"][0]["id"] == transcription_id
+    assert "segments_json" not in list_response.json()["items"][0]
+    assert "transcript_text" not in list_response.json()["items"][0]
     assert fetch_response.status_code == 200
     assert fetch_response.json()["id"] == transcription_id
+    assert "segments_json" not in fetch_response.json()
+    assert "transcript_text" not in fetch_response.json()
     assert fetch_response.json()["speakers"] is None
     assert fetch_response.json()["turns"] is None
 
@@ -117,12 +121,27 @@ async def test_fetch_returns_speakers_and_turns_when_present(api_client):
         await session.commit()
 
     response = await api_client.get(f"/transcriptions/{transcription_id}")
+    list_response = await api_client.get("/transcriptions/")
 
     assert response.status_code == 200
+    assert list_response.status_code == 200
+    assert "segments_json" not in response.json()
+    assert "transcript_text" not in response.json()
     assert response.json()["speakers"] == [
         {"speaker_key": "speaker_0", "display_name": "Speaker 1"}
     ]
     assert response.json()["turns"] == [
+        {
+            "speaker_key": "speaker_0",
+            "start": 0.0,
+            "end": 1.0,
+            "text": "Hello world",
+        }
+    ]
+    assert list_response.json()["items"][0]["speakers"] == [
+        {"speaker_key": "speaker_0", "display_name": "Speaker 1"}
+    ]
+    assert list_response.json()["items"][0]["turns"] == [
         {
             "speaker_key": "speaker_0",
             "start": 0.0,
