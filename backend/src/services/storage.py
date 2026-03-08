@@ -1,3 +1,4 @@
+import logging
 import re
 from pathlib import Path
 from typing import Protocol
@@ -11,9 +12,19 @@ VIDEO_EXTENSIONS = {".mp4", ".mkv", ".avi", ".mov", ".webm", ".wmv", ".flv"}
 ALLOWED_EXTENSIONS = AUDIO_EXTENSIONS | VIDEO_EXTENSIONS
 CHUNK_SIZE = 1024 * 1024
 
+logger = logging.getLogger(__name__)
+
 
 class AsyncChunkReader(Protocol):
     async def read(self, size: int) -> bytes: ...
+
+
+class UploadValidationError(ValueError):
+    pass
+
+
+class UploadTooLargeError(UploadValidationError):
+    pass
 
 
 def sanitize_filename(filename: str) -> str:
@@ -29,7 +40,7 @@ def detect_media_type(filename: str) -> MediaType:
         return MediaType.AUDIO
     if ext in VIDEO_EXTENSIONS:
         return MediaType.VIDEO
-    raise ValueError(f"Unsupported file type: {ext}")
+    raise UploadValidationError(f"Unsupported file type: {ext}")
 
 
 async def save_upload_stream(
@@ -46,7 +57,7 @@ async def save_upload_stream(
         while chunk := await file.read(chunk_size):
             total_size += len(chunk)
             if total_size > max_upload_bytes:
-                raise ValueError(
+                raise UploadTooLargeError(
                     f"File too large. Maximum size: {max_upload_bytes // (1024 * 1024)} MB"
                 )
             await handle.write(chunk)
@@ -56,3 +67,21 @@ async def save_upload_stream(
 
 def remove_file(path: Path) -> None:
     path.unlink(missing_ok=True)
+
+
+def remove_managed_file(*, upload_root: Path, stored_path: str | Path) -> bool:
+    root = Path(upload_root).resolve(strict=False)
+    candidate = Path(stored_path).resolve(strict=False)
+
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        logger.warning(
+            "Skipping cleanup for unmanaged path %s outside upload root %s",
+            candidate,
+            root,
+        )
+        return False
+
+    candidate.unlink(missing_ok=True)
+    return True

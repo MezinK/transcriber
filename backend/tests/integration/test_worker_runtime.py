@@ -31,6 +31,7 @@ from infra.models import (
 )
 from services.jobs import recover_stale_leases
 from worker.engine import TranscriptionResult
+from worker import main as worker_main
 from worker.main import WorkerRuntime
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
@@ -187,6 +188,44 @@ async def _seed_transcription(session_factory, tmp_path: Path) -> tuple[uuid.UUI
         return transcription.id, upload_path
 
 
+async def _seed_stale_processing_transcription(
+    session_factory,
+    tmp_path: Path,
+    *,
+    worker_id: uuid.UUID,
+    now: datetime,
+) -> tuple[uuid.UUID, Path]:
+    upload_path = tmp_path / f"{uuid.uuid4()}-stale.wav"
+    upload_path.write_bytes(b"stale")
+
+    async with session_factory() as session:
+        async with session.begin():
+            transcription = Transcription(
+                source_filename="stale.wav",
+                media_type=MediaType.AUDIO,
+                status=TranscriptionStatus.PROCESSING,
+                attempt_count=1,
+            )
+            artifact = TranscriptionArtifact(
+                transcription=transcription,
+                upload_path=str(upload_path),
+            )
+            worker = Worker(
+                id=worker_id,
+                label="stale-worker",
+                status=WorkerStatus.PROCESSING,
+            )
+            lease = JobLease(
+                transcription=transcription,
+                worker_id=worker_id,
+                leased_until=now - timedelta(minutes=1),
+                heartbeat_at=now - timedelta(minutes=2),
+                attempt=1,
+            )
+            session.add_all([transcription, artifact, worker, lease])
+        return transcription.id, upload_path
+
+
 async def _wait_for(predicate, timeout_seconds: float = 5.0) -> None:
     deadline = time.monotonic() + timeout_seconds
     while time.monotonic() < deadline:
@@ -236,6 +275,7 @@ async def test_worker_claims_a_pending_job(database: DatabaseHarness, tmp_path: 
         heartbeat_interval_seconds=5.0,
         lease_duration_seconds=30,
         poll_interval_seconds=1.0,
+        upload_dir=str(tmp_path),
         now_factory=lambda: datetime(2026, 3, 8, 16, 0, tzinfo=UTC),
     )
 
@@ -270,6 +310,7 @@ async def test_heartbeat_renews_lease_during_work(
         heartbeat_interval_seconds=0.1,
         lease_duration_seconds=1,
         poll_interval_seconds=1.0,
+        upload_dir=str(tmp_path),
     )
 
     task = asyncio.create_task(runtime.run_once())
@@ -305,6 +346,7 @@ async def test_completion_writes_results_and_clears_lease(
         heartbeat_interval_seconds=1.0,
         lease_duration_seconds=30,
         poll_interval_seconds=1.0,
+        upload_dir=str(tmp_path),
     )
 
     processed = await runtime.run_once()
@@ -338,6 +380,7 @@ async def test_failure_requeues_with_incremented_attempt_count(
         heartbeat_interval_seconds=1.0,
         lease_duration_seconds=30,
         poll_interval_seconds=1.0,
+        upload_dir=str(tmp_path),
         max_attempts=3,
     )
 
@@ -370,6 +413,7 @@ async def test_shutdown_preserves_recoverable_state(
         heartbeat_interval_seconds=10.0,
         lease_duration_seconds=1,
         poll_interval_seconds=1.0,
+        upload_dir=str(tmp_path),
         now_factory=lambda: now,
     )
 
@@ -396,6 +440,7 @@ async def test_shutdown_preserves_recoverable_state(
     summary = await recover_stale_leases(
         session_factory=database.session_factory,
         max_attempts=3,
+        upload_dir=tmp_path,
         now_factory=lambda: now + timedelta(minutes=5),
     )
 
@@ -406,4 +451,58 @@ async def test_shutdown_preserves_recoverable_state(
     assert summary.requeued_ids == (transcription_id,)
     assert recovered.status == TranscriptionStatus.PENDING
     assert recovered_lease is None
+    await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_run_recovers_stale_leases_during_busy_iterations(
+    database: DatabaseHarness,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    now = datetime(2026, 3, 8, 17, 0, tzinfo=UTC)
+    stale_worker_id = uuid.uuid4()
+    stale_transcription_id, _ = await _seed_stale_processing_transcription(
+        database.session_factory,
+        tmp_path,
+        worker_id=stale_worker_id,
+        now=now,
+    )
+    pending_transcription_id, _ = await _seed_transcription(
+        database.session_factory,
+        tmp_path,
+    )
+
+    runtime = WorkerRuntime(
+        session_factory=database.session_factory,
+        engine=SuccessfulEngine("busy pass"),
+        heartbeat_interval_seconds=1.0,
+        lease_duration_seconds=30,
+        poll_interval_seconds=1.0,
+        upload_dir=str(tmp_path),
+        max_attempts=3,
+        now_factory=lambda: now,
+    )
+
+    original_complete = worker_main.complete_transcription
+
+    async def complete_and_stop(*args, **kwargs):
+        await original_complete(*args, **kwargs)
+        runtime.request_shutdown()
+
+    monkeypatch.setattr(worker_main, "complete_transcription", complete_and_stop)
+
+    await asyncio.wait_for(runtime.run(), timeout=5)
+
+    async with database.session_factory() as session:
+        pending = await session.get(Transcription, pending_transcription_id)
+        stale = await session.get(Transcription, stale_transcription_id)
+        stale_lease = await session.get(JobLease, stale_transcription_id)
+        stale_worker = await session.get(Worker, stale_worker_id)
+
+    assert pending.status == TranscriptionStatus.COMPLETED
+    assert stale.status == TranscriptionStatus.PENDING
+    assert stale.error == "Lease expired; job returned to queue"
+    assert stale_lease is None
+    assert stale_worker.status == WorkerStatus.STALE
     await runtime.close()

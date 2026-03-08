@@ -8,7 +8,7 @@ import pytest_asyncio
 from api.main import create_app
 from infra.config import reset_settings_cache
 from infra.db import get_session_factory, reset_db_caches
-from infra.models import MediaType, Transcription, TranscriptionArtifact, TranscriptionStatus
+from infra.models import JobLease, MediaType, Transcription, TranscriptionArtifact
 from services.jobs import claim_next_transcription
 
 
@@ -18,6 +18,25 @@ async def api_client(postgres_database, tmp_path, monkeypatch):
     upload_dir.mkdir()
     monkeypatch.setenv("DATABASE_URL", postgres_database.database_url)
     monkeypatch.setenv("UPLOAD_DIR", str(upload_dir))
+    reset_settings_cache()
+    await reset_db_caches()
+
+    app = create_app()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        yield client
+
+    await reset_db_caches()
+    reset_settings_cache()
+
+
+@pytest_asyncio.fixture
+async def limited_api_client(postgres_database, tmp_path, monkeypatch):
+    upload_dir = tmp_path / "uploads"
+    upload_dir.mkdir()
+    monkeypatch.setenv("DATABASE_URL", postgres_database.database_url)
+    monkeypatch.setenv("UPLOAD_DIR", str(upload_dir))
+    monkeypatch.setenv("MAX_UPLOAD_BYTES", "1")
     reset_settings_cache()
     await reset_db_caches()
 
@@ -78,8 +97,14 @@ async def test_delete_returns_409_while_leased(api_client):
     )
     transcription_id = uuid.UUID(create_response.json()["id"])
 
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        artifact = await session.get(TranscriptionArtifact, transcription_id)
+        assert artifact is not None
+        file_path = Path(artifact.upload_path)
+
     await claim_next_transcription(
-        session_factory=get_session_factory(),
+        session_factory=session_factory,
         worker_id=uuid.uuid4(),
         lease_duration_seconds=120,
     )
@@ -87,6 +112,14 @@ async def test_delete_returns_409_while_leased(api_client):
     response = await api_client.delete(f"/transcriptions/{transcription_id}")
 
     assert response.status_code == 409
+    assert file_path.exists() is True
+
+    async with session_factory() as session:
+        transcription = await session.get(Transcription, transcription_id)
+        lease = await session.get(JobLease, transcription_id)
+
+    assert transcription is not None
+    assert lease is not None
 
 
 @pytest.mark.asyncio
@@ -110,3 +143,25 @@ async def test_delete_removes_transcription_and_file(api_client):
     async with session_factory() as session:
         transcription = await session.get(Transcription, transcription_id)
         assert transcription is None
+
+
+@pytest.mark.asyncio
+async def test_upload_unsupported_extension_returns_400(api_client):
+    response = await api_client.post(
+        "/transcriptions/",
+        files={"file": ("notes.txt", b"hello world", "text/plain")},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Unsupported file type: .txt"}
+
+
+@pytest.mark.asyncio
+async def test_upload_oversized_payload_returns_413(limited_api_client):
+    response = await limited_api_client.post(
+        "/transcriptions/",
+        files={"file": ("too-big.wav", b"ab", "audio/wav")},
+    )
+
+    assert response.status_code == 413
+    assert response.json() == {"detail": "File too large. Maximum size: 0 MB"}

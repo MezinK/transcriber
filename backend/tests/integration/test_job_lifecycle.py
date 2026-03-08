@@ -33,6 +33,7 @@ from services.jobs import (
     complete_transcription,
     recover_stale_leases,
 )
+from services.uploads import delete_upload
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 REPO_ROOT = BACKEND_ROOT.parent
@@ -327,6 +328,7 @@ async def test_recover_stale_leases_requeues_or_fails_based_on_attempts(
     summary = await recover_stale_leases(
         session_factory=database.session_factory,
         max_attempts=2,
+        upload_dir=tmp_path,
         now_factory=lambda: now,
     )
 
@@ -455,6 +457,7 @@ async def test_complete_transcription_removes_upload_only_after_commit(
             worker_id=worker_id,
             transcript_text="done",
             segments_json={"segments": [{"text": "done"}]},
+            upload_dir=tmp_path,
             now_factory=lambda: datetime(2026, 3, 8, 12, 21, tzinfo=UTC),
         )
 
@@ -477,6 +480,7 @@ async def test_complete_transcription_removes_upload_only_after_commit(
         worker_id=worker_id,
         transcript_text="done",
         segments_json={"segments": [{"text": "done"}]},
+        upload_dir=tmp_path,
         now_factory=lambda: datetime(2026, 3, 8, 12, 22, tzinfo=UTC),
     )
 
@@ -491,3 +495,63 @@ async def test_complete_transcription_removes_upload_only_after_commit(
     assert completed_lease is None
     assert completed_worker.status == WorkerStatus.IDLE
     assert upload_file.exists() is False
+
+
+@pytest.mark.asyncio
+async def test_delete_upload_prevents_concurrent_claim_before_commit(
+    database: DatabaseHarness,
+    tmp_path: Path,
+):
+    worker_id = uuid.uuid4()
+    await _create_worker(database.session_factory, worker_id=worker_id, label="worker-1")
+    upload_file = tmp_path / "delete-race.wav"
+    upload_file.write_bytes(b"audio")
+    transcription = await _create_transcription(
+        database.session_factory,
+        upload_path=str(upload_file),
+    )
+
+    entered_event = asyncio.Event()
+    release_event = asyncio.Event()
+    delayed_factory = _ProxySessionFactory(
+        database.session_factory,
+        lambda session: _DelayedCommitSession(
+            session,
+            entered_event=entered_event,
+            release_event=release_event,
+        ),
+    )
+
+    delete_task = asyncio.create_task(
+        delete_upload(
+            session_factory=delayed_factory,
+            transcription_id=transcription.id,
+            upload_dir=tmp_path,
+        )
+    )
+    await asyncio.wait_for(entered_event.wait(), timeout=5)
+
+    claim = await claim_next_transcription(
+        session_factory=database.session_factory,
+        worker_id=worker_id,
+        lease_duration_seconds=120,
+        now_factory=lambda: datetime(2026, 3, 8, 12, 30, tzinfo=UTC),
+    )
+
+    release_event.set()
+    await asyncio.wait_for(delete_task, timeout=5)
+
+    assert claim is None
+    assert upload_file.exists() is False
+
+    async with database.session_factory() as session:
+        deleted_transcription = await session.get(Transcription, transcription.id)
+        deleted_artifact = await session.get(TranscriptionArtifact, transcription.id)
+        deleted_lease = await session.get(JobLease, transcription.id)
+        worker = await session.get(Worker, worker_id)
+
+    assert deleted_transcription is None
+    assert deleted_artifact is None
+    assert deleted_lease is None
+    assert worker.status == WorkerStatus.IDLE
+    assert worker.current_transcription_id is None

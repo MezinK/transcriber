@@ -12,6 +12,7 @@ from infra.config import get_settings
 from infra.db import get_session_factory
 from infra.time import utc_now
 from services.jobs import (
+    LeaseNotOwnedError,
     claim_next_transcription,
     complete_transcription,
     fail_transcription,
@@ -33,6 +34,7 @@ class WorkerRuntime:
         lease_duration_seconds: int,
         heartbeat_interval_seconds: float,
         poll_interval_seconds: float,
+        upload_dir: str,
         max_attempts: int = 3,
         now_factory=lambda: utc_now(),
     ) -> None:
@@ -43,6 +45,7 @@ class WorkerRuntime:
         self.lease_duration_seconds = lease_duration_seconds
         self.heartbeat_interval_seconds = heartbeat_interval_seconds
         self.poll_interval_seconds = poll_interval_seconds
+        self.upload_dir = upload_dir
         self.max_attempts = max_attempts
         self.now_factory = now_factory
         self.current_claim = None
@@ -73,6 +76,12 @@ class WorkerRuntime:
 
         while not self._shutdown_requested.is_set():
             processed = await self.run_once()
+            await recover_stale_leases(
+                session_factory=self.session_factory,
+                max_attempts=self.max_attempts,
+                upload_dir=self.upload_dir,
+                now_factory=self.now_factory,
+            )
             if processed:
                 continue
 
@@ -80,11 +89,6 @@ class WorkerRuntime:
                 session_factory=self.session_factory,
                 worker_id=self.worker_id,
                 now=self.now_factory,
-            )
-            await recover_stale_leases(
-                session_factory=self.session_factory,
-                max_attempts=self.max_attempts,
-                now_factory=self.now_factory,
             )
 
             with suppress(TimeoutError):
@@ -123,6 +127,7 @@ class WorkerRuntime:
                 worker_id=self.worker_id,
                 transcript_text=result.text,
                 segments_json={"segments": result.segments},
+                upload_dir=self.upload_dir,
                 now_factory=self.now_factory,
             )
             self.current_claim = None
@@ -137,6 +142,7 @@ class WorkerRuntime:
                 error=f"Transcription failed: {type(exc).__name__}",
                 max_attempts=self.max_attempts,
                 retryable=True,
+                upload_dir=self.upload_dir,
                 now_factory=self.now_factory,
             )
             self.current_claim = None
@@ -161,13 +167,16 @@ class WorkerRuntime:
             if stop_event.is_set() or self._shutdown_requested.is_set():
                 return
 
-            await renew_lease(
-                session_factory=self.session_factory,
-                transcription_id=transcription_id,
-                worker_id=self.worker_id,
-                lease_duration_seconds=self.lease_duration_seconds,
-                now_factory=self.now_factory,
-            )
+            try:
+                await renew_lease(
+                    session_factory=self.session_factory,
+                    transcription_id=transcription_id,
+                    worker_id=self.worker_id,
+                    lease_duration_seconds=self.lease_duration_seconds,
+                    now_factory=self.now_factory,
+                )
+            except LeaseNotOwnedError:
+                return
 
 
 async def main() -> None:
@@ -178,6 +187,7 @@ async def main() -> None:
         lease_duration_seconds=settings.lease_duration_seconds,
         heartbeat_interval_seconds=settings.heartbeat_interval_seconds,
         poll_interval_seconds=settings.worker_poll_interval_seconds,
+        upload_dir=settings.upload_dir,
     )
 
     loop = asyncio.get_running_loop()

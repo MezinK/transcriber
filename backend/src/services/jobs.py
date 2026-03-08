@@ -21,7 +21,7 @@ from infra.models import (
     WorkerStatus,
 )
 from infra.time import utc_now
-from services.storage import remove_file
+from services.storage import remove_managed_file
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,10 +54,6 @@ class JobLifecycleError(RuntimeError):
 
 
 class LeaseNotOwnedError(JobLifecycleError):
-    pass
-
-
-class TranscriptionDeletionConflictError(JobLifecycleError):
     pass
 
 
@@ -235,6 +231,7 @@ async def complete_transcription(
     worker_id: uuid.UUID,
     transcript_text: str,
     segments_json: dict | None,
+    upload_dir: str | Path,
     now_factory: Callable[[], datetime] = utc_now,
 ) -> None:
     upload_path: str | None = None
@@ -267,7 +264,10 @@ async def complete_transcription(
         )
         await session.commit()
     if upload_path is not None:
-        remove_file(Path(upload_path))
+        remove_managed_file(
+            upload_root=Path(upload_dir),
+            stored_path=upload_path,
+        )
 
 
 async def fail_transcription(
@@ -278,6 +278,7 @@ async def fail_transcription(
     error: str,
     max_attempts: int,
     retryable: bool = True,
+    upload_dir: str | Path,
     now_factory: Callable[[], datetime] = utc_now,
 ) -> TranscriptionStatus:
     upload_path: str | None = None
@@ -312,7 +313,10 @@ async def fail_transcription(
         )
         await session.commit()
     if upload_path is not None:
-        remove_file(Path(upload_path))
+        remove_managed_file(
+            upload_root=Path(upload_dir),
+            stored_path=upload_path,
+        )
     return next_status
 
 
@@ -320,6 +324,7 @@ async def recover_stale_leases(
     *,
     session_factory: Callable[[], SessionContextManager],
     max_attempts: int,
+    upload_dir: str | Path,
     now_factory: Callable[[], datetime] = utc_now,
 ) -> RecoverySummary:
     now = now_factory()
@@ -373,26 +378,12 @@ async def recover_stale_leases(
         await session.commit()
 
     for upload_path in upload_paths:
-        remove_file(Path(upload_path))
+        remove_managed_file(
+            upload_root=Path(upload_dir),
+            stored_path=upload_path,
+        )
 
     return RecoverySummary(
         requeued_ids=tuple(requeued_ids),
         failed_ids=tuple(failed_ids),
     )
-
-
-async def ensure_transcription_deletable(
-    *,
-    session_factory: Callable[[], SessionContextManager],
-    transcription_id: uuid.UUID,
-) -> None:
-    async with session_factory() as session:
-        result = await session.execute(
-            select(JobLease.transcription_id).where(
-                JobLease.transcription_id == transcription_id
-            )
-        )
-        if result.scalar_one_or_none() is not None:
-            raise TranscriptionDeletionConflictError(
-                f"Transcription {transcription_id} has an active lease"
-            )

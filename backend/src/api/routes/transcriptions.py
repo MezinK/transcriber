@@ -9,11 +9,8 @@ from api.schemas import TranscriptionListResponse, TranscriptionResponse
 from infra.config import get_settings
 from infra.db import get_session_factory
 from infra.models import Transcription, TranscriptionArtifact
-from services.jobs import (
-    TranscriptionDeletionConflictError,
-    ensure_transcription_deletable,
-)
-from services.uploads import create_upload, delete_upload
+from services.storage import UploadTooLargeError, UploadValidationError
+from services.uploads import DeleteUploadResult, create_upload, delete_upload
 
 router = APIRouter()
 
@@ -21,13 +18,25 @@ router = APIRouter()
 @router.post("/", response_model=TranscriptionResponse, status_code=status.HTTP_201_CREATED)
 async def upload_transcription(file: UploadFile = File(...)) -> TranscriptionResponse:
     settings = get_settings()
-    transcription = await create_upload(
-        file=file,
-        original_filename=file.filename or "",
-        session_factory=get_session_factory(),
-        upload_dir=Path(settings.upload_dir),
-        max_upload_bytes=settings.max_upload_bytes,
-    )
+    try:
+        transcription = await create_upload(
+            file=file,
+            original_filename=file.filename or "",
+            session_factory=get_session_factory(),
+            upload_dir=Path(settings.upload_dir),
+            max_upload_bytes=settings.max_upload_bytes,
+        )
+    except UploadTooLargeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=str(exc),
+        ) from exc
+    except UploadValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
     return TranscriptionResponse(
         id=transcription.id,
         source_filename=transcription.source_filename,
@@ -87,22 +96,17 @@ async def get_transcription(transcription_id: uuid.UUID) -> TranscriptionRespons
 @router.delete("/{transcription_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_transcription_route(transcription_id: uuid.UUID) -> Response:
     session_factory = get_session_factory()
-    try:
-        await ensure_transcription_deletable(
-            session_factory=session_factory,
-            transcription_id=transcription_id,
-        )
-    except TranscriptionDeletionConflictError:
+    outcome = await delete_upload(
+        session_factory=session_factory,
+        transcription_id=transcription_id,
+        upload_dir=Path(get_settings().upload_dir),
+    )
+    if outcome.result == DeleteUploadResult.LEASED:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Transcription is currently being processed",
-        ) from None
-
-    deleted = await delete_upload(
-        session_factory=session_factory,
-        transcription_id=transcription_id,
-    )
-    if not deleted:
+        )
+    if outcome.result == DeleteUploadResult.NOT_FOUND:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Transcription not found",

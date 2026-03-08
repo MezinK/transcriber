@@ -23,6 +23,9 @@ class FakeResult:
     def scalar_one_or_none(self):
         return self._scalar
 
+    def scalars(self):
+        return [] if self._scalar is None else self._scalar
+
 
 class FakeSession:
     def __init__(self, *, scalars: list[object | None] | None = None, fail_commit: bool = False):
@@ -175,7 +178,7 @@ async def test_complete_transcription_writes_artifacts_and_cleans_up_after_commi
     worker_id = uuid.uuid4()
     lease, transcription, artifact = build_lease(worker_id=worker_id)
     session = FakeSession()
-    removed_paths: list[Path] = []
+    removed_paths: list[tuple[Path, Path]] = []
     now = datetime(2026, 3, 8, 10, 7, tzinfo=UTC)
 
     async def fake_get_owned_lease(*args, **kwargs):
@@ -186,7 +189,15 @@ async def test_complete_transcription_writes_artifacts_and_cleans_up_after_commi
 
     monkeypatch.setattr(jobs, "_get_owned_lease", fake_get_owned_lease)
     monkeypatch.setattr(jobs, "_update_worker", fake_update_worker)
-    monkeypatch.setattr(jobs, "remove_file", lambda path: removed_paths.append(path))
+    monkeypatch.setattr(
+        jobs,
+        "remove_managed_file",
+        lambda *, upload_root, stored_path: removed_paths.append(
+            (Path(upload_root), Path(stored_path))
+        )
+        or True,
+        raising=False,
+    )
 
     await jobs.complete_transcription(
         session_factory=FakeSessionFactory(session),
@@ -194,6 +205,7 @@ async def test_complete_transcription_writes_artifacts_and_cleans_up_after_commi
         worker_id=worker_id,
         transcript_text="hello world",
         segments_json={"segments": [{"text": "hello world"}]},
+        upload_dir="/tmp/uploads",
         now_factory=lambda: now,
     )
 
@@ -201,7 +213,7 @@ async def test_complete_transcription_writes_artifacts_and_cleans_up_after_commi
     assert transcription.completed_at == now
     assert artifact.transcript_text == "hello world"
     assert artifact.segments_json == {"segments": [{"text": "hello world"}]}
-    assert removed_paths == [Path(artifact.upload_path)]
+    assert removed_paths == [(Path("/tmp/uploads"), Path(artifact.upload_path))]
 
 
 @pytest.mark.asyncio
@@ -211,7 +223,7 @@ async def test_fail_transcription_requeues_retryable_jobs(
     worker_id = uuid.uuid4()
     lease, transcription, _ = build_lease(worker_id=worker_id, attempt=1)
     session = FakeSession()
-    removed_paths: list[Path] = []
+    removed_paths: list[tuple[Path, Path]] = []
 
     async def fake_get_owned_lease(*args, **kwargs):
         return lease
@@ -221,7 +233,15 @@ async def test_fail_transcription_requeues_retryable_jobs(
 
     monkeypatch.setattr(jobs, "_get_owned_lease", fake_get_owned_lease)
     monkeypatch.setattr(jobs, "_update_worker", fake_update_worker)
-    monkeypatch.setattr(jobs, "remove_file", lambda path: removed_paths.append(path))
+    monkeypatch.setattr(
+        jobs,
+        "remove_managed_file",
+        lambda *, upload_root, stored_path: removed_paths.append(
+            (Path(upload_root), Path(stored_path))
+        )
+        or True,
+        raising=False,
+    )
 
     status = await jobs.fail_transcription(
         session_factory=FakeSessionFactory(session),
@@ -229,6 +249,7 @@ async def test_fail_transcription_requeues_retryable_jobs(
         worker_id=worker_id,
         error="temporary issue",
         max_attempts=3,
+        upload_dir="/tmp/uploads",
     )
 
     assert status == TranscriptionStatus.PENDING
@@ -244,7 +265,7 @@ async def test_fail_transcription_marks_final_failure_and_cleans_up_after_commit
     worker_id = uuid.uuid4()
     lease, transcription, artifact = build_lease(worker_id=worker_id, attempt=3)
     session = FakeSession()
-    removed_paths: list[Path] = []
+    removed_paths: list[tuple[Path, Path]] = []
 
     async def fake_get_owned_lease(*args, **kwargs):
         return lease
@@ -254,7 +275,15 @@ async def test_fail_transcription_marks_final_failure_and_cleans_up_after_commit
 
     monkeypatch.setattr(jobs, "_get_owned_lease", fake_get_owned_lease)
     monkeypatch.setattr(jobs, "_update_worker", fake_update_worker)
-    monkeypatch.setattr(jobs, "remove_file", lambda path: removed_paths.append(path))
+    monkeypatch.setattr(
+        jobs,
+        "remove_managed_file",
+        lambda *, upload_root, stored_path: removed_paths.append(
+            (Path(upload_root), Path(stored_path))
+        )
+        or True,
+        raising=False,
+    )
 
     status = await jobs.fail_transcription(
         session_factory=FakeSessionFactory(session),
@@ -262,12 +291,13 @@ async def test_fail_transcription_marks_final_failure_and_cleans_up_after_commit
         worker_id=worker_id,
         error="permanent issue",
         max_attempts=3,
+        upload_dir="/tmp/uploads",
     )
 
     assert status == TranscriptionStatus.FAILED
     assert transcription.status == TranscriptionStatus.FAILED
     assert transcription.error == "permanent issue"
-    assert removed_paths == [Path(artifact.upload_path)]
+    assert removed_paths == [(Path("/tmp/uploads"), Path(artifact.upload_path))]
 
 
 @pytest.mark.asyncio
@@ -277,7 +307,7 @@ async def test_complete_transcription_does_not_cleanup_when_commit_fails(
     worker_id = uuid.uuid4()
     lease, transcription, artifact = build_lease(worker_id=worker_id)
     session = FakeSession(fail_commit=True)
-    removed_paths: list[Path] = []
+    removed_paths: list[tuple[Path, Path]] = []
 
     async def fake_get_owned_lease(*args, **kwargs):
         return lease
@@ -287,7 +317,15 @@ async def test_complete_transcription_does_not_cleanup_when_commit_fails(
 
     monkeypatch.setattr(jobs, "_get_owned_lease", fake_get_owned_lease)
     monkeypatch.setattr(jobs, "_update_worker", fake_update_worker)
-    monkeypatch.setattr(jobs, "remove_file", lambda path: removed_paths.append(path))
+    monkeypatch.setattr(
+        jobs,
+        "remove_managed_file",
+        lambda *, upload_root, stored_path: removed_paths.append(
+            (Path(upload_root), Path(stored_path))
+        )
+        or True,
+        raising=False,
+    )
 
     with pytest.raises(RuntimeError, match="commit failed"):
         await jobs.complete_transcription(
@@ -296,6 +334,7 @@ async def test_complete_transcription_does_not_cleanup_when_commit_fails(
             worker_id=worker_id,
             transcript_text="hello world",
             segments_json=None,
+            upload_dir="/tmp/uploads",
         )
 
     assert transcription.status == TranscriptionStatus.COMPLETED
@@ -304,12 +343,36 @@ async def test_complete_transcription_does_not_cleanup_when_commit_fails(
 
 
 @pytest.mark.asyncio
-async def test_ensure_transcription_deletable_raises_when_lease_exists():
-    transcription_id = uuid.uuid4()
-    session = FakeSession(scalars=[transcription_id])
+async def test_recover_stale_leases_uses_managed_cleanup_for_failed_jobs(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    worker_id = uuid.uuid4()
+    stale_lease, stale_transcription, stale_artifact = build_lease(
+        worker_id=worker_id,
+        attempt=2,
+    )
+    stale_transcription.status = TranscriptionStatus.PROCESSING
+    session = FakeSession(scalars=[[stale_lease]])
+    removed_paths: list[tuple[Path, Path]] = []
+    now = datetime(2026, 3, 8, 10, 7, tzinfo=UTC)
 
-    with pytest.raises(jobs.TranscriptionDeletionConflictError):
-        await jobs.ensure_transcription_deletable(
-            session_factory=FakeSessionFactory(session),
-            transcription_id=transcription_id,
+    monkeypatch.setattr(
+        jobs,
+        "remove_managed_file",
+        lambda *, upload_root, stored_path: removed_paths.append(
+            (Path(upload_root), Path(stored_path))
         )
+        or True,
+        raising=False,
+    )
+
+    summary = await jobs.recover_stale_leases(
+        session_factory=FakeSessionFactory(session),
+        max_attempts=2,
+        upload_dir="/tmp/uploads",
+        now_factory=lambda: now,
+    )
+
+    assert summary.failed_ids == (stale_lease.transcription_id,)
+    assert summary.requeued_ids == ()
+    assert removed_paths == [(Path("/tmp/uploads"), Path(stale_artifact.upload_path))]
