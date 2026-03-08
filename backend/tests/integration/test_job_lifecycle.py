@@ -455,8 +455,16 @@ async def test_complete_transcription_removes_upload_only_after_commit(
             session_factory=failing_factory,
             transcription_id=transcription.id,
             worker_id=worker_id,
-            transcript_text="done",
             segments_json={"segments": [{"text": "done"}]},
+            speakers_json=[{"speaker_key": "speaker_0", "display_name": "Speaker 1"}],
+            turns_json=[
+                {
+                    "speaker_key": "speaker_0",
+                    "start": 0.0,
+                    "end": 1.0,
+                    "text": "done",
+                }
+            ],
             upload_dir=tmp_path,
             now_factory=lambda: datetime(2026, 3, 8, 12, 21, tzinfo=UTC),
         )
@@ -471,15 +479,24 @@ async def test_complete_transcription_removes_upload_only_after_commit(
         failed_commit_lease = await session.get(JobLease, transcription.id)
 
     assert failed_commit_transcription.status == TranscriptionStatus.PROCESSING
-    assert failed_commit_artifact.transcript_text is None
+    assert failed_commit_artifact.speakers_json is None
+    assert failed_commit_artifact.turns_json is None
     assert failed_commit_lease is not None
 
     await complete_transcription(
         session_factory=database.session_factory,
         transcription_id=transcription.id,
         worker_id=worker_id,
-        transcript_text="done",
         segments_json={"segments": [{"text": "done"}]},
+        speakers_json=[{"speaker_key": "speaker_0", "display_name": "Speaker 1"}],
+        turns_json=[
+            {
+                "speaker_key": "speaker_0",
+                "start": 0.0,
+                "end": 1.0,
+                "text": "done",
+            }
+        ],
         upload_dir=tmp_path,
         now_factory=lambda: datetime(2026, 3, 8, 12, 22, tzinfo=UTC),
     )
@@ -491,7 +508,17 @@ async def test_complete_transcription_removes_upload_only_after_commit(
         completed_worker = await session.get(Worker, worker_id)
 
     assert completed_transcription.status == TranscriptionStatus.COMPLETED
-    assert completed_artifact.transcript_text == "done"
+    assert completed_artifact.speakers_json == [
+        {"speaker_key": "speaker_0", "display_name": "Speaker 1"}
+    ]
+    assert completed_artifact.turns_json == [
+        {
+            "speaker_key": "speaker_0",
+            "start": 0.0,
+            "end": 1.0,
+            "text": "done",
+        }
+    ]
     assert completed_lease is None
     assert completed_worker.status == WorkerStatus.IDLE
     assert upload_file.exists() is False

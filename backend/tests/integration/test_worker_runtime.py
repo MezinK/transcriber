@@ -30,6 +30,7 @@ from infra.models import (
     WorkerStatus,
 )
 from services.jobs import recover_stale_leases
+from worker.diarization import SpeakerSpan
 from worker.engine import TranscriptionResult
 from worker import main as worker_main
 from worker.main import WorkerRuntime
@@ -242,13 +243,32 @@ class SuccessfulEngine:
     def transcribe(self, file_path: str) -> TranscriptionResult:
         return TranscriptionResult(
             text=self.text,
-            segments=[{"text": self.text, "start": 0.0, "end": 1.0}],
+            segments=[
+                {
+                    "text": self.text,
+                    "start": 0.0,
+                    "end": 1.0,
+                    "words": [
+                        {
+                            "word": self.text,
+                            "start": 0.0,
+                            "end": 1.0,
+                            "probability": 0.9,
+                        }
+                    ],
+                }
+            ],
         )
 
 
 class FailingEngine:
     def transcribe(self, file_path: str) -> TranscriptionResult:
         raise RuntimeError("engine blew up")
+
+
+class SuccessfulDiarizationEngine:
+    def diarize(self, file_path: str) -> list[SpeakerSpan]:
+        return [SpeakerSpan(speaker_key="speaker_0", start=0.0, end=10.0)]
 
 
 class BlockingEngine:
@@ -343,6 +363,7 @@ async def test_completion_writes_results_and_clears_lease(
     runtime = WorkerRuntime(
         session_factory=database.session_factory,
         engine=SuccessfulEngine("final text"),
+        diarization_engine=SuccessfulDiarizationEngine(),
         heartbeat_interval_seconds=1.0,
         lease_duration_seconds=30,
         poll_interval_seconds=1.0,
@@ -359,7 +380,17 @@ async def test_completion_writes_results_and_clears_lease(
 
     assert processed is True
     assert transcription.status == TranscriptionStatus.COMPLETED
-    assert artifact.transcript_text == "final text"
+    assert artifact.speakers_json == [
+        {"speaker_key": "speaker_0", "display_name": "Speaker 1"}
+    ]
+    assert artifact.turns_json == [
+        {
+            "speaker_key": "speaker_0",
+            "start": 0.0,
+            "end": 1.0,
+            "text": "final text",
+        }
+    ]
     assert lease is None
     assert worker.status == WorkerStatus.IDLE
     assert upload_path.exists() is False
@@ -476,6 +507,7 @@ async def test_run_recovers_stale_leases_during_busy_iterations(
     runtime = WorkerRuntime(
         session_factory=database.session_factory,
         engine=SuccessfulEngine("busy pass"),
+        diarization_engine=SuccessfulDiarizationEngine(),
         heartbeat_interval_seconds=1.0,
         lease_duration_seconds=30,
         poll_interval_seconds=1.0,

@@ -79,6 +79,32 @@ def build_transcript_artifacts(
     return TranscriptArtifacts(speakers=speakers, turns=turns)
 
 
+def build_transcript_artifacts_from_segments(
+    *, segments: list[dict], speaker_spans: list[dict]
+) -> TranscriptArtifacts:
+    words: list[dict] = []
+    for segment in segments:
+        segment_words = list(segment.get("words") or [])
+        if segment_words:
+            words.extend(segment_words)
+            continue
+
+        text = str(segment.get("text", "")).strip()
+        if not text:
+            continue
+        start = float(segment.get("start", 0.0))
+        end = float(segment.get("end", start))
+        words.append(
+            {
+                "word": text,
+                "start": start,
+                "end": end,
+            }
+        )
+
+    return build_transcript_artifacts(words=words, speaker_spans=speaker_spans)
+
+
 def rename_speaker(*, speakers: list[dict], speaker_key: str, display_name: str) -> list[dict]:
     renamed: list[dict] = []
     for speaker in speakers:

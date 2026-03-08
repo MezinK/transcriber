@@ -229,8 +229,9 @@ async def complete_transcription(
     session_factory: Callable[[], SessionContextManager],
     transcription_id: uuid.UUID,
     worker_id: uuid.UUID,
-    transcript_text: str,
     segments_json: dict | None,
+    speakers_json: list[dict] | None,
+    turns_json: list[dict] | None,
     upload_dir: str | Path,
     now_factory: Callable[[], datetime] = utc_now,
 ) -> None:
@@ -249,8 +250,9 @@ async def complete_transcription(
         lease.transcription.status = TranscriptionStatus.COMPLETED
         lease.transcription.error = None
         lease.transcription.completed_at = now
-        lease.transcription.artifact.transcript_text = transcript_text
         lease.transcription.artifact.segments_json = segments_json
+        lease.transcription.artifact.speakers_json = speakers_json
+        lease.transcription.artifact.turns_json = turns_json
         upload_path = lease.transcription.artifact.upload_path
         await _update_worker(
             session,

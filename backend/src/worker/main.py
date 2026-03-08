@@ -19,7 +19,9 @@ from services.jobs import (
     recover_stale_leases,
     renew_lease,
 )
+from services.transcript_assembly import build_transcript_artifacts_from_segments
 from services.workers import heartbeat_worker, register_worker
+from worker.diarization import DiarizationEngine, load_diarization_engine
 from worker.engine import TranscriptionEngine, load_engine
 
 
@@ -29,6 +31,7 @@ class WorkerRuntime:
         *,
         session_factory,
         engine: TranscriptionEngine,
+        diarization_engine: DiarizationEngine | None = None,
         worker_id: uuid.UUID | None = None,
         label: str | None = None,
         lease_duration_seconds: int,
@@ -40,6 +43,7 @@ class WorkerRuntime:
     ) -> None:
         self.session_factory = session_factory
         self.engine = engine
+        self.diarization_engine = diarization_engine
         self.worker_id = worker_id or uuid.uuid7()
         self.label = label or f"worker-{str(self.worker_id)[:8]}"
         self.lease_duration_seconds = lease_duration_seconds
@@ -121,12 +125,32 @@ class WorkerRuntime:
                 self._executor,
                 functools.partial(self.engine.transcribe, claim.upload_path),
             )
+            speaker_spans = (
+                []
+                if self.diarization_engine is None
+                else await asyncio.get_running_loop().run_in_executor(
+                    self._executor,
+                    functools.partial(self.diarization_engine.diarize, claim.upload_path),
+                )
+            )
+            artifacts = build_transcript_artifacts_from_segments(
+                segments=result.segments,
+                speaker_spans=[
+                    {
+                        "speaker_key": span.speaker_key,
+                        "start": span.start,
+                        "end": span.end,
+                    }
+                    for span in speaker_spans
+                ],
+            )
             await complete_transcription(
                 session_factory=self.session_factory,
                 transcription_id=claim.transcription_id,
                 worker_id=self.worker_id,
-                transcript_text=result.text,
                 segments_json={"segments": result.segments},
+                speakers_json=artifacts.speakers,
+                turns_json=artifacts.turns,
                 upload_dir=self.upload_dir,
                 now_factory=self.now_factory,
             )
@@ -184,6 +208,11 @@ async def main() -> None:
     runtime = WorkerRuntime(
         session_factory=get_session_factory(),
         engine=load_engine(),
+        diarization_engine=load_diarization_engine(
+            settings.diarization_engine,
+            auth_token=settings.pyannote_auth_token,
+            device=settings.diarization_device,
+        ),
         lease_duration_seconds=settings.lease_duration_seconds,
         heartbeat_interval_seconds=settings.heartbeat_interval_seconds,
         poll_interval_seconds=settings.worker_poll_interval_seconds,
