@@ -23,15 +23,16 @@ export function TranscriptView() {
 
   if (error || !job) {
     return (
-      <div>
-        <p className="text-red-400 text-sm mb-4">
-          {typeof error === "string" ? error : "Not found"}
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <p className="text-zinc-400 text-sm mb-1">Transcription not found</p>
+        <p className="text-zinc-600 text-xs mb-6">
+          The page you're looking for doesn't exist.
         </p>
         <button
           onClick={() => navigate("/")}
           className="text-zinc-500 hover:text-zinc-300 transition-colors text-sm"
         >
-          &larr; Back
+          &larr; Back to transcriptions
         </button>
       </div>
     );

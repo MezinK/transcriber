@@ -16,7 +16,11 @@ class ApiError extends Error {
 function extractMessage(body: Record<string, unknown>, fallback: string): string {
   const detail = body.detail;
   if (typeof detail === "string") return detail;
-  if (detail != null) return JSON.stringify(detail);
+  // FastAPI validation errors: [{msg: "...", ...}, ...]
+  if (Array.isArray(detail) && detail.length > 0 && typeof detail[0]?.msg === "string") {
+    return detail[0].msg;
+  }
+  if (detail != null) return String(detail);
   return fallback;
 }
 

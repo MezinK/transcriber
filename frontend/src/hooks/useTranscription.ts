@@ -29,6 +29,11 @@ export function useTranscription(id: string | undefined) {
     } catch (err) {
       if (mountedRef.current) {
         setError(err instanceof Error ? err.message : "Failed to fetch job");
+        // Stop polling on error — retrying won't help for 4xx
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
       }
     } finally {
       if (mountedRef.current) setLoading(false);
