@@ -22,6 +22,7 @@ services:
     environment:
       DATABASE_URL: "postgresql+asyncpg://app:app@postgres:5432/transcriptions"
       UPLOAD_DIR: /uploads
+      MAX_UPLOAD_BYTES: "524288000"  # 500 MB
     volumes:
       - uploads:/uploads
     depends_on:
@@ -39,6 +40,7 @@ services:
       WHISPER_MODEL: base
     volumes:
       - uploads:/uploads
+    stop_grace_period: 30s
     depends_on:
       postgres:
         condition: service_healthy

@@ -1,5 +1,5 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Protocol
 
 
 @dataclass
@@ -8,5 +8,6 @@ class TranscriptionResult:
     segments: list[dict]
 
 
-class TranscriptionEngine(Protocol):
+class TranscriptionEngine(ABC):
+    @abstractmethod
     def transcribe(self, file_path: str) -> TranscriptionResult: ...
